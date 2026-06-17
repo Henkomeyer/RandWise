@@ -91,6 +91,52 @@ Filters:
 - POST `/whatsapp/link`
 - POST `/whatsapp/unlink`
 
+### Link WhatsApp request
+
+```json
+{
+  "phoneNumber": "+27825550101",
+  "platformContactId": "whatsapp-contact-id"
+}
+```
+
+### WhatsApp status response
+
+```json
+{
+  "isLinked": true,
+  "isVerified": true,
+  "platformContactId": "whatsapp-contact-id",
+  "verifiedUtc": "2026-06-17T10:00:00Z"
+}
+```
+
+### WhatsApp webhook MVP request
+
+`POST /webhooks/whatsapp` requires `X-Hub-Signature-256` when `WhatsApp:AppSecret` is configured.
+
+```json
+{
+  "messageId": "wamid.123",
+  "platformContactId": "whatsapp-contact-id",
+  "fromPhoneNumber": "+27825550101",
+  "messageType": "text",
+  "text": "R250 petrol",
+  "receivedUtc": "2026-06-17T10:00:00Z"
+}
+```
+
+### WhatsApp webhook response
+
+```json
+{
+  "messageId": "wamid.123",
+  "accepted": true,
+  "duplicate": false,
+  "processingStatus": "Received"
+}
+```
+
 ## Create transaction request
 
 ```json
@@ -158,3 +204,5 @@ Filters:
 - Use stable string enum values in public JSON.
 - Pagination returns items, page, pageSize, totalCount and totalPages.
 - User IDs are never accepted from normal client requests; derive them from the authenticated principal.
+- WhatsApp webhooks must verify signatures when a provider secret is configured and must be idempotent on provider message ID.
+- WhatsApp capture must process parsed transactions through the transaction application service, not direct transaction table writes.

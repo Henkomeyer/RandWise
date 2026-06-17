@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 4 dashboard is complete. Wave 5 WhatsApp capture is the next incomplete wave.
+Wave 5 WhatsApp capture is in progress. The first backend batch for contact linking, webhook ingestion, parser foundation and outbound abstraction is complete.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -19,7 +19,7 @@ Actual repository state:
 | 2 First vertical slice | Complete | Passed |
 | 3 Budgeting | Complete | Passed |
 | 4 Dashboard | Complete | Passed |
-| 5 WhatsApp capture | Not started | Pending |
+| 5 WhatsApp capture | In progress | Pending |
 | 6 Intelligence/jobs | Not started | Pending |
 | 7 Reports/privacy | Not started | Pending |
 | 8 Beta hardening | Not started | Pending |
@@ -203,6 +203,16 @@ Actual repository state:
 - `npm run build` passed.
 - `VITE_DEMO_MODE=true npm run build` passed.
 - `npm run test:e2e` is not available yet.
+
+### Wave 5 WhatsApp backend foundation checkpoint
+
+- RW-501 WhatsApp contact linking complete for authenticated link/status/unlink endpoints.
+- RW-502 webhook verification and idempotent ingestion complete for signed MVP webhook payloads.
+- RW-503 deterministic parser foundation complete for initial amount-and-description transaction messages.
+- RW-504 outbound notification abstraction complete with a no-op local adapter.
+- Sensitive phone numbers and raw message text are protected before storage; searchable phone matching uses a SHA-256 hash.
+- WhatsApp webhook ingestion persists `IncomingMessage` records only. RW-505 remains responsible for creating transactions through `ITransactionService`.
+- `dotnet test RandWise.sln` passed with 45 tests.
 
 ## Open decisions
 

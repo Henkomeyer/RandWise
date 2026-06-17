@@ -8,12 +8,14 @@ using RandWise.Application.Dashboard;
 using RandWise.Application.FinancialProfile;
 using RandWise.Application.Security;
 using RandWise.Application.Transactions;
+using RandWise.Application.WhatsApp;
 using RandWise.Infrastructure.Budgeting;
 using RandWise.Infrastructure.Dashboard;
 using RandWise.Infrastructure.FinancialProfiles;
 using RandWise.Infrastructure.Identity;
 using RandWise.Infrastructure.Security;
 using RandWise.Infrastructure.Transactions;
+using RandWise.Infrastructure.WhatsApp;
 
 namespace RandWise.Infrastructure.Persistence;
 
@@ -46,6 +48,8 @@ public static class ServiceCollectionExtensions
             .AddEntityFrameworkStores<RandWiseDbContext>();
 
         services.Configure<JwtTokenOptions>(configuration.GetSection(JwtTokenOptions.SectionName));
+        services.Configure<SensitiveDataOptions>(configuration.GetSection(SensitiveDataOptions.SectionName));
+        services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IIdGenerator, GuidIdGenerator>();
         services.AddScoped<IRandWiseAuthService, RandWiseAuthService>();
@@ -57,6 +61,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRecurringTransactionService, EfRecurringTransactionService>();
         services.AddScoped<ISafeToSpendService, EfSafeToSpendService>();
         services.AddScoped<IDashboardService, EfDashboardService>();
+        services.AddScoped<IWhatsAppContactService, EfWhatsAppContactService>();
+        services.AddScoped<IWhatsAppWebhookService, EfWhatsAppWebhookService>();
+        services.AddScoped<IDeterministicWhatsAppParser, DeterministicWhatsAppParser>();
+        services.AddScoped<IWhatsAppOutboundClient, NoOpWhatsAppOutboundClient>();
+        services.AddScoped<IWhatsAppWebhookVerifier, WhatsAppWebhookVerifier>();
+        services.AddScoped<ISensitiveDataProtector, AesSensitiveDataProtector>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
         services.AddScoped<IRefreshTokenStore, EfRefreshTokenStore>();
         services.AddSingleton<IAccessTokenIssuer, ConfiguredAccessTokenIssuer>();

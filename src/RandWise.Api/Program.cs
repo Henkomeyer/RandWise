@@ -71,6 +71,7 @@ api.MapBudgetPeriodEndpoints();
 api.MapCategoryBudgetRootEndpoints();
 api.MapRecurringTransactionEndpoints();
 api.MapDashboardEndpoints();
+api.MapWhatsAppEndpoints();
 
 app.Run();
 
