@@ -64,6 +64,7 @@ api.MapGet("/health", () => Results.Ok(new HealthResponse("Healthy", DateTimeOff
     .WithName("GetHealth");
 
 api.MapAuthEndpoints();
+api.MapProfileEndpoints();
 api.MapFinancialProfileEndpoints();
 api.MapTransactionEndpoints();
 api.MapCategoryEndpoints();
@@ -72,6 +73,7 @@ api.MapBudgetPeriodEndpoints();
 api.MapCategoryBudgetRootEndpoints();
 api.MapRecurringTransactionEndpoints();
 api.MapDashboardEndpoints();
+api.MapReportEndpoints();
 api.MapWhatsAppEndpoints();
 
 app.Run();

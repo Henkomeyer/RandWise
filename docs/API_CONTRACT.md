@@ -89,6 +89,40 @@ Filters:
 - GET `/reports/category-breakdown`
 - GET `/reports/export/csv`
 
+### Weekly report response
+
+```json
+{
+  "weekStartDate": "2026-06-15",
+  "weekEndDate": "2026-06-21",
+  "incomeInCents": 500000,
+  "expenseInCents": 12500,
+  "netInCents": 487500,
+  "transactionCount": 2,
+  "summary": "Income covered recorded spending this week.",
+  "topCategories": []
+}
+```
+
+### Monthly report response
+
+```json
+{
+  "year": 2026,
+  "month": 6,
+  "incomeInCents": 500000,
+  "expenseInCents": 12500,
+  "netInCents": 487500,
+  "averageDailyExpenseInCents": 416,
+  "summary": "Income covered recorded spending this month.",
+  "topCategories": []
+}
+```
+
+### Profile export response
+
+`GET /profile/export` returns a JSON bundle containing the user's profile, financial profile, budgets, transactions, recurring commitments, category rules and WhatsApp contact metadata. Encrypted phone numbers, raw WhatsApp message text and token values are excluded.
+
 ## WhatsApp
 - GET `/webhooks/whatsapp`
 - POST `/webhooks/whatsapp`

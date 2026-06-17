@@ -64,4 +64,11 @@ public sealed class AppUser : Entity
         UpdatedUtc = DeletedUtc.Value;
         Status = AppUserStatus.Deleted;
     }
+
+    public void AnonymizeAndMarkDeleted(DateTime deletedUtc)
+    {
+        DisplayName = $"Deleted user {Id[..Math.Min(8, Id.Length)]}";
+        PreferredLanguage = "deleted";
+        MarkDeleted(deletedUtc);
+    }
 }

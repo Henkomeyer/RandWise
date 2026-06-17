@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 6 intelligence and jobs is complete. The repository is ready to start Wave 7 reports and privacy.
+Wave 7 reports and privacy is in progress. Backend report, export, deletion and audit foundations are complete; frontend reports/privacy controls remain pending.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -21,7 +21,7 @@ Actual repository state:
 | 4 Dashboard | Complete | Passed |
 | 5 WhatsApp capture | Complete | Passed |
 | 6 Intelligence/jobs | Complete | Passed |
-| 7 Reports/privacy | Not started | Pending |
+| 7 Reports/privacy | In progress | Pending |
 | 8 Beta hardening | Not started | Pending |
 
 ## Decisions
@@ -264,6 +264,16 @@ Actual repository state:
 - `npm run build` passed.
 - `VITE_DEMO_MODE=true npm run build` passed.
 - `npm run test:e2e` is not available yet.
+
+### Wave 7 reports/privacy backend checkpoint
+
+- RW-701 weekly financial story backend complete through `GET /api/v1/reports/weekly`.
+- RW-702 monthly Money Wrap backend complete through `GET /api/v1/reports/monthly`.
+- RW-703 CSV export complete through `GET /api/v1/reports/export/csv`.
+- RW-704 data export and account deletion backend complete through `GET /api/v1/profile/export` and `DELETE /api/v1/profile`.
+- RW-705 audit coverage complete for report views, CSV export, data export and account deletion.
+- `dotnet test RandWise.sln` passed with 54 tests.
+- Remaining Wave 7 work: RW-706 frontend reports and privacy controls, then RW-707 privacy/reporting acceptance.
 
 ## Open decisions
 
