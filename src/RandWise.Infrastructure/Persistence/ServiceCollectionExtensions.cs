@@ -1,0 +1,58 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using RandWise.Application.Auth;
+using RandWise.Application.Common;
+using RandWise.Application.FinancialProfile;
+using RandWise.Application.Security;
+using RandWise.Application.Transactions;
+using RandWise.Infrastructure.FinancialProfiles;
+using RandWise.Infrastructure.Identity;
+using RandWise.Infrastructure.Security;
+using RandWise.Infrastructure.Transactions;
+
+namespace RandWise.Infrastructure.Persistence;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddRandWisePersistence(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var options = new RandWisePersistenceOptions
+        {
+            ConnectionString = configuration[$"{RandWisePersistenceOptions.SectionName}:ConnectionString"]
+                ?? new RandWisePersistenceOptions().ConnectionString
+        };
+
+        services.AddSingleton<SqliteWalConnectionInterceptor>();
+        services.AddDbContext<RandWiseDbContext>((serviceProvider, dbContextOptions) =>
+        {
+            dbContextOptions
+                .UseSqlite(options.ConnectionString)
+                .AddInterceptors(serviceProvider.GetRequiredService<SqliteWalConnectionInterceptor>());
+        });
+
+        services.AddIdentityCore<RandWiseIdentityUser>(identityOptions =>
+            {
+                identityOptions.User.RequireUniqueEmail = true;
+                identityOptions.Password.RequiredLength = 8;
+                identityOptions.Password.RequireNonAlphanumeric = false;
+            })
+            .AddEntityFrameworkStores<RandWiseDbContext>();
+
+        services.Configure<JwtTokenOptions>(configuration.GetSection(JwtTokenOptions.SectionName));
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IIdGenerator, GuidIdGenerator>();
+        services.AddScoped<IRandWiseAuthService, RandWiseAuthService>();
+        services.AddScoped<IFinancialProfileService, EfFinancialProfileService>();
+        services.AddScoped<ITransactionService, EfTransactionService>();
+        services.AddScoped<IAuthTokenService, AuthTokenService>();
+        services.AddScoped<IRefreshTokenStore, EfRefreshTokenStore>();
+        services.AddSingleton<IAccessTokenIssuer, ConfiguredAccessTokenIssuer>();
+        services.AddSingleton<IRefreshTokenGenerator, CryptographicRefreshTokenGenerator>();
+        services.AddSingleton<IRefreshTokenHasher, Sha256RefreshTokenHasher>();
+
+        return services;
+    }
+}
