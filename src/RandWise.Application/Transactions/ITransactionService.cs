@@ -14,6 +14,13 @@ public interface ITransactionService
         string userId,
         string incomingMessageId,
         CreateTransactionRequest request,
+        int confidenceBasisPoints,
+        CancellationToken cancellationToken);
+
+    Task<TransactionResponse> CreateFromRecurringAsync(
+        string userId,
+        string recurringTransactionId,
+        CreateTransactionRequest request,
         CancellationToken cancellationToken);
 
     Task<PagedResponse<TransactionResponse>> ListAsync(

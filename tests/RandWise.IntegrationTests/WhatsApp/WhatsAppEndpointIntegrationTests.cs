@@ -7,9 +7,13 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RandWise.Application.Jobs;
 using RandWise.Contracts.Auth;
+using RandWise.Contracts.Categories;
+using RandWise.Contracts.CategoryRules;
 using RandWise.Contracts.Common;
 using RandWise.Contracts.FinancialProfile;
+using RandWise.Contracts.RecurringTransactions;
 using RandWise.Contracts.Transactions;
 using RandWise.Contracts.WhatsApp;
 using RandWise.Infrastructure.Persistence;
@@ -162,10 +166,133 @@ public sealed class WhatsAppEndpointIntegrationTests
         Assert.Equal(25000, transaction.AmountInCents);
         Assert.Equal("Petrol", transaction.Description);
         Assert.Equal("whatsapp", transaction.Source);
+        Assert.Equal("needsReview", transaction.Status);
 
         await factory.UseContextAsync(async context =>
         {
             Assert.Empty(await context.Notifications.ToListAsync());
+        });
+    }
+
+    [Fact]
+    public async Task PersonalCategoryRule_CategorisesWhatsAppTransaction()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var tokens = await RegisterAsync(client, "wa-personal-rule@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        var category = await CreateCategoryAsync(client, "Fuel");
+        using var ruleResponse = await client.PostAsJsonAsync(
+            "/api/v1/category-rules",
+            new CategoryRuleRequest("keyword", "petrol", category.Id, 100));
+        ruleResponse.EnsureSuccessStatusCode();
+        var rule = await ReadAsync<CategoryRuleResponse>(ruleResponse);
+        Assert.Equal(category.Id, rule.CategoryId);
+
+        using var linkResponse = await client.PostAsJsonAsync(
+            "/api/v1/whatsapp/link",
+            new LinkWhatsAppRequest("+27 82 555 0505", "wa-contact-5"));
+        linkResponse.EnsureSuccessStatusCode();
+        client.DefaultRequestHeaders.Authorization = null;
+
+        using var webhookResponse = await PostWebhookAsync(client, """
+            {
+              "messageId": "wamid.personal-rule",
+              "platformContactId": "wa-contact-5",
+              "fromPhoneNumber": "+27825550505",
+              "messageType": "text",
+              "text": "R450 petrol",
+              "receivedUtc": "2026-06-17T10:00:00Z"
+            }
+            """);
+        webhookResponse.EnsureSuccessStatusCode();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        using var listResponse = await client.GetAsync("/api/v1/transactions?source=whatsapp");
+        listResponse.EnsureSuccessStatusCode();
+        var page = await ReadAsync<PagedResponse<TransactionResponse>>(listResponse);
+        var transaction = Assert.Single(page.Items);
+        Assert.Equal(category.Id, transaction.CategoryId);
+        Assert.Equal("confirmed", transaction.Status);
+    }
+
+    [Fact]
+    public async Task SystemMerchantRule_CategorisesKnownMerchant()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var tokens = await RegisterAsync(client, "wa-system-rule@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        var petrolCategory = await CreateCategoryAsync(client, "Petrol");
+        using var linkResponse = await client.PostAsJsonAsync(
+            "/api/v1/whatsapp/link",
+            new LinkWhatsAppRequest("+27 82 555 0606", "wa-contact-6"));
+        linkResponse.EnsureSuccessStatusCode();
+        client.DefaultRequestHeaders.Authorization = null;
+
+        using var webhookResponse = await PostWebhookAsync(client, """
+            {
+              "messageId": "wamid.system-rule",
+              "platformContactId": "wa-contact-6",
+              "fromPhoneNumber": "+27825550606",
+              "messageType": "text",
+              "text": "R300 Shell",
+              "receivedUtc": "2026-06-17T10:00:00Z"
+            }
+            """);
+        webhookResponse.EnsureSuccessStatusCode();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        using var listResponse = await client.GetAsync("/api/v1/transactions?source=whatsapp");
+        listResponse.EnsureSuccessStatusCode();
+        var page = await ReadAsync<PagedResponse<TransactionResponse>>(listResponse);
+        var transaction = Assert.Single(page.Items);
+        Assert.Equal(petrolCategory.Id, transaction.CategoryId);
+        Assert.Equal("confirmed", transaction.Status);
+    }
+
+    [Fact]
+    public async Task BackgroundJobProcessor_GeneratesDueRecurringTransactions()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var tokens = await RegisterAsync(client, "recurring-job@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var today = new DateOnly(2026, 06, 17);
+        var category = await CreateCategoryAsync(client, "Internet");
+
+        using var recurringResponse = await client.PostAsJsonAsync(
+            "/api/v1/recurring-transactions",
+            new RecurringTransactionRequest(
+                category.Id,
+                "Fibre",
+                "Fibre Co",
+                79900,
+                "expense",
+                "monthly",
+                today.Day,
+                null,
+                today,
+                null,
+                true));
+        recurringResponse.EnsureSuccessStatusCode();
+
+        var generated = await factory.GenerateRecurringAsync(today);
+        Assert.Equal(1, generated);
+
+        using var listResponse = await client.GetAsync("/api/v1/transactions?source=recurring");
+        listResponse.EnsureSuccessStatusCode();
+        var page = await ReadAsync<PagedResponse<TransactionResponse>>(listResponse);
+        var transaction = Assert.Single(page.Items);
+        Assert.Equal("Fibre", transaction.Description);
+        Assert.Equal("recurring", transaction.Source);
+
+        await factory.UseContextAsync(async context =>
+        {
+            var recurring = await context.RecurringTransactions.SingleAsync();
+            Assert.Equal(today.AddMonths(1), recurring.NextOccurrenceDate);
         });
     }
 
@@ -268,6 +395,15 @@ public sealed class WhatsAppEndpointIntegrationTests
         response.EnsureSuccessStatusCode();
     }
 
+    private static async Task<CategoryResponse> CreateCategoryAsync(HttpClient client, string name)
+    {
+        using var categoryResponse = await client.PostAsJsonAsync(
+            "/api/v1/categories",
+            new CategoryRequest(name, "expense", null, 10));
+        categoryResponse.EnsureSuccessStatusCode();
+        return await ReadAsync<CategoryResponse>(categoryResponse);
+    }
+
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
         where T : notnull
     {
@@ -318,6 +454,13 @@ public sealed class WhatsAppEndpointIntegrationTests
             using var scope = factory.Services.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<RandWiseDbContext>();
             await action(context);
+        }
+
+        public async Task<int> GenerateRecurringAsync(DateOnly today)
+        {
+            using var scope = factory.Services.CreateScope();
+            var processor = scope.ServiceProvider.GetRequiredService<IBackgroundJobProcessor>();
+            return await processor.GenerateDueRecurringTransactionsAsync(today, CancellationToken.None);
         }
 
         public async ValueTask DisposeAsync()

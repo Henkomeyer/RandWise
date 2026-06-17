@@ -13,6 +13,7 @@ namespace RandWise.Infrastructure.Transactions;
 public sealed class EfTransactionService : ITransactionService
 {
     private const string DefaultExpenseCategoryId = "system-expense-uncategorised";
+    private const int AutoConfirmThresholdBasisPoints = 9000;
     private readonly RandWiseDbContext dbContext;
     private readonly IClock clock;
     private readonly IIdGenerator idGenerator;
@@ -29,22 +30,34 @@ public sealed class EfTransactionService : ITransactionService
         CreateTransactionRequest request,
         CancellationToken cancellationToken)
     {
-        return await CreateCoreAsync(userId, request, incomingMessageId: null, cancellationToken);
+        return await CreateCoreAsync(userId, request, incomingMessageId: null, recurringTransactionId: null, confidenceBasisPoints: null, cancellationToken);
     }
 
     public async Task<TransactionResponse> CreateFromWhatsAppAsync(
         string userId,
         string incomingMessageId,
         CreateTransactionRequest request,
+        int confidenceBasisPoints,
         CancellationToken cancellationToken)
     {
-        return await CreateCoreAsync(userId, request, incomingMessageId, cancellationToken);
+        return await CreateCoreAsync(userId, request, incomingMessageId, recurringTransactionId: null, confidenceBasisPoints, cancellationToken);
+    }
+
+    public async Task<TransactionResponse> CreateFromRecurringAsync(
+        string userId,
+        string recurringTransactionId,
+        CreateTransactionRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await CreateCoreAsync(userId, request, incomingMessageId: null, recurringTransactionId, confidenceBasisPoints: null, cancellationToken);
     }
 
     private async Task<TransactionResponse> CreateCoreAsync(
         string userId,
         CreateTransactionRequest request,
         string? incomingMessageId,
+        string? recurringTransactionId,
+        int? confidenceBasisPoints,
         CancellationToken cancellationToken)
     {
         var transactionType = DomainEnumNames.ParseTransactionType(request.TransactionType);
@@ -62,13 +75,18 @@ public sealed class EfTransactionService : ITransactionService
             request.Merchant,
             request.TransactionDate,
             source,
-            TransactionStatus.Confirmed,
-            null,
+            confidenceBasisPoints is >= 7000 and < AutoConfirmThresholdBasisPoints ? TransactionStatus.NeedsReview : TransactionStatus.Confirmed,
+            confidenceBasisPoints,
             now);
 
         if (!string.IsNullOrWhiteSpace(incomingMessageId))
         {
             transaction.LinkIncomingMessage(incomingMessageId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(recurringTransactionId))
+        {
+            transaction.LinkRecurringTransaction(recurringTransactionId);
         }
 
         dbContext.Transactions.Add(transaction);

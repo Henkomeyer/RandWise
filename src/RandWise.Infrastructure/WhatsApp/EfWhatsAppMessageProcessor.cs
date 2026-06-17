@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RandWise.Application.Common;
+using RandWise.Application.Intelligence;
 using RandWise.Application.Security;
 using RandWise.Application.Transactions;
 using RandWise.Application.WhatsApp;
@@ -15,6 +16,7 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
 {
     private readonly RandWiseDbContext dbContext;
     private readonly IClock clock;
+    private readonly ICategoryClassificationService categoryClassificationService;
     private readonly IDeterministicWhatsAppParser parser;
     private readonly IIdGenerator idGenerator;
     private readonly IWhatsAppOutboundClient outboundClient;
@@ -24,6 +26,7 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
     public EfWhatsAppMessageProcessor(
         RandWiseDbContext dbContext,
         IClock clock,
+        ICategoryClassificationService categoryClassificationService,
         IDeterministicWhatsAppParser parser,
         IIdGenerator idGenerator,
         IWhatsAppOutboundClient outboundClient,
@@ -32,6 +35,7 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
     {
         this.dbContext = dbContext;
         this.clock = clock;
+        this.categoryClassificationService = categoryClassificationService;
         this.parser = parser;
         this.idGenerator = idGenerator;
         this.outboundClient = outboundClient;
@@ -65,6 +69,16 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
 
         var text = protector.Unprotect(incoming.RawTextEncrypted);
         var parsed = parser.Parse(text, DateOnly.FromDateTime(incoming.ReceivedUtc));
+        CategoryClassificationResult? classification = null;
+        if (parsed.Intent == "create-transaction" && parsed.Description is not null)
+        {
+            classification = await categoryClassificationService.ClassifyAsync(
+                incoming.UserId!,
+                parsed.Description,
+                parsed.Merchant,
+                cancellationToken);
+        }
+
         var interpretation = MessageInterpretation.Create(
             idGenerator.NewId(),
             incoming.Id,
@@ -74,8 +88,8 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
             parsed.Description,
             parsed.Merchant,
             parsed.TransactionDate,
-            null,
-            parsed.ConfidenceBasisPoints,
+            classification?.CategoryId,
+            Math.Min(parsed.ConfidenceBasisPoints, classification?.ConfidenceBasisPoints ?? parsed.ConfidenceBasisPoints),
             parsed.ParserVersion,
             JsonSerializer.Serialize(parsed),
             clock.UtcNow);
@@ -99,11 +113,12 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
             new CreateTransactionRequest(
                 parsed.AmountInCents.Value,
                 parsed.TransactionType,
-                null,
+                classification?.CategoryId,
                 parsed.Description,
                 parsed.Merchant,
                 parsed.TransactionDate.Value,
                 "whatsapp"),
+            interpretation.ConfidenceBasisPoints,
             cancellationToken);
 
         await QueueConfirmationAsync(incoming, parsed, cancellationToken);

@@ -67,6 +67,7 @@ api.MapAuthEndpoints();
 api.MapFinancialProfileEndpoints();
 api.MapTransactionEndpoints();
 api.MapCategoryEndpoints();
+api.MapCategoryRuleEndpoints();
 api.MapBudgetPeriodEndpoints();
 api.MapCategoryBudgetRootEndpoints();
 api.MapRecurringTransactionEndpoints();

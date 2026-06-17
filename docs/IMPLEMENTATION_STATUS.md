@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 5 WhatsApp capture is complete. Wave 6 intelligence and jobs is the next incomplete wave.
+Wave 6 intelligence and jobs is in progress. The first intelligence/jobs batch for category rules, system rules, confidence handling, classifier interface, job processor abstraction and recurring generation is complete.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -20,7 +20,7 @@ Actual repository state:
 | 3 Budgeting | Complete | Passed |
 | 4 Dashboard | Complete | Passed |
 | 5 WhatsApp capture | Complete | Passed |
-| 6 Intelligence/jobs | Not started | Pending |
+| 6 Intelligence/jobs | In progress | Pending |
 | 7 Reports/privacy | Not started | Pending |
 | 8 Beta hardening | Not started | Pending |
 
@@ -237,6 +237,16 @@ Actual repository state:
 - `npm run build` passed.
 - `VITE_DEMO_MODE=true npm run build` passed.
 - `npm run test:e2e` is not available yet.
+
+### Wave 6 intelligence/jobs foundation checkpoint
+
+- RW-601 personal category rules complete for API create/list/deactivate and WhatsApp classification.
+- RW-602 system merchant rules complete for deterministic category matching before AI.
+- RW-603 confidence and needs-review flow complete for WhatsApp transactions: 9000+ confirms, 7000-8999 creates `needsReview`.
+- RW-604 AI classifier interface complete with no-op local adapter.
+- RW-605 database-backed background processor abstraction complete for queued WhatsApp processing and due recurring generation.
+- RW-606 recurring transaction generation complete for due auto-create items through the transaction application service.
+- `dotnet test RandWise.sln` passed with 50 tests.
 
 ## Open decisions
 

@@ -37,6 +37,11 @@ All errors use RFC 9457-style Problem Details.
 - PUT `/categories/{id}`
 - DELETE `/categories/{id}`
 
+## Category rules
+- GET `/category-rules`
+- POST `/category-rules`
+- DELETE `/category-rules/{id}`
+
 ## Category budgets
 - GET `/budget-periods/{periodId}/category-budgets`
 - POST `/budget-periods/{periodId}/category-budgets`
@@ -151,6 +156,32 @@ Filters:
 }
 ```
 
+## Category rule request
+
+```json
+{
+  "matchType": "keyword",
+  "matchValue": "petrol",
+  "categoryId": "category-id",
+  "priority": 100
+}
+```
+
+## Category rule response
+
+```json
+{
+  "id": "rule-id",
+  "matchType": "keyword",
+  "matchValue": "petrol",
+  "categoryId": "category-id",
+  "priority": 100,
+  "isActive": true,
+  "createdUtc": "2026-06-17T10:00:00Z",
+  "updatedUtc": "2026-06-17T10:00:00Z"
+}
+```
+
 ## Dashboard initial response
 
 ```json
@@ -206,3 +237,4 @@ Filters:
 - User IDs are never accepted from normal client requests; derive them from the authenticated principal.
 - WhatsApp webhooks must verify signatures when a provider secret is configured and must be idempotent on provider message ID.
 - WhatsApp capture must process parsed transactions through the transaction application service, not direct transaction table writes.
+- Personal category rules and deterministic system rules must run before AI classification.
