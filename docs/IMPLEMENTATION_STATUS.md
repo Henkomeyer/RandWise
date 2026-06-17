@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 5 WhatsApp capture is in progress. Contact linking, webhook ingestion, parser foundation, outbound abstraction and transaction processing through the transaction service are complete.
+Wave 5 WhatsApp capture is complete. Wave 6 intelligence and jobs is the next incomplete wave.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -19,7 +19,7 @@ Actual repository state:
 | 2 First vertical slice | Complete | Passed |
 | 3 Budgeting | Complete | Passed |
 | 4 Dashboard | Complete | Passed |
-| 5 WhatsApp capture | In progress | Pending |
+| 5 WhatsApp capture | Complete | Passed |
 | 6 Intelligence/jobs | Not started | Pending |
 | 7 Reports/privacy | Not started | Pending |
 | 8 Beta hardening | Not started | Pending |
@@ -221,6 +221,22 @@ Actual repository state:
 - WhatsApp-created transactions are linked back to `IncomingMessageId` and are visible through `GET /api/v1/transactions?source=whatsapp`.
 - Unsupported, unlinked or non-text messages are marked failed instead of creating transactions.
 - `dotnet test RandWise.sln` passed with 46 tests.
+
+### RW-508 WhatsApp acceptance
+
+- RW-506 confirmation modes complete for `silent`, `confirm` and `coach`.
+- RW-507 webhook/parser integration tests complete for signed webhook ingestion, duplicate handling, deterministic parsing, WhatsApp transaction creation, source filtering and confirmation behavior.
+- Confirmation messages are protected before persistence and routed through the outbound WhatsApp abstraction.
+- Silent mode creates no notification; confirm and coach modes create sent WhatsApp transaction-confirmation notifications.
+- `dotnet format RandWise.sln --verify-no-changes` passed.
+- `dotnet build RandWise.sln` passed.
+- `dotnet test RandWise.sln` passed with 47 tests.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed with 9 tests.
+- `npm run build` passed.
+- `VITE_DEMO_MODE=true npm run build` passed.
+- `npm run test:e2e` is not available yet.
 
 ## Open decisions
 

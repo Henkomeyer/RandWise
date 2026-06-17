@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RandWise.Contracts.Auth;
 using RandWise.Contracts.Common;
+using RandWise.Contracts.FinancialProfile;
 using RandWise.Contracts.Transactions;
 using RandWise.Contracts.WhatsApp;
 using RandWise.Infrastructure.Persistence;
@@ -64,6 +65,7 @@ public sealed class WhatsAppEndpointIntegrationTests
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var tokens = await RegisterAsync(client, "wa-webhook@example.com");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        await ConfigureNotificationModeAsync(client, "confirm");
 
         using var linkResponse = await client.PostAsJsonAsync(
             "/api/v1/whatsapp/link",
@@ -99,6 +101,7 @@ public sealed class WhatsAppEndpointIntegrationTests
             var appUser = await context.AppUsers.SingleAsync();
             var interpretation = await context.MessageInterpretations.SingleAsync();
             var transaction = await context.Transactions.SingleAsync();
+            var notification = await context.Notifications.SingleAsync();
 
             Assert.Equal(appUser.Id, message.UserId);
             Assert.Equal("wamid.123", message.WhatsAppMessageId);
@@ -113,6 +116,10 @@ public sealed class WhatsAppEndpointIntegrationTests
             Assert.Equal(25000, transaction.AmountCents);
             Assert.Equal("Petrol", transaction.Description);
             Assert.Equal("WhatsApp", transaction.Source.ToString());
+            Assert.Equal("TransactionConfirmation", notification.NotificationType.ToString());
+            Assert.Equal("WhatsApp", notification.Channel.ToString());
+            Assert.Equal("Sent", notification.Status.ToString());
+            Assert.DoesNotContain("Added R250", notification.MessageEncrypted, StringComparison.Ordinal);
         });
 
     }
@@ -124,6 +131,7 @@ public sealed class WhatsAppEndpointIntegrationTests
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var tokens = await RegisterAsync(client, "wa-transaction-api@example.com");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        await ConfigureNotificationModeAsync(client, "silent");
 
         using var linkResponse = await client.PostAsJsonAsync(
             "/api/v1/whatsapp/link",
@@ -154,6 +162,50 @@ public sealed class WhatsAppEndpointIntegrationTests
         Assert.Equal(25000, transaction.AmountInCents);
         Assert.Equal("Petrol", transaction.Description);
         Assert.Equal("whatsapp", transaction.Source);
+
+        await factory.UseContextAsync(async context =>
+        {
+            Assert.Empty(await context.Notifications.ToListAsync());
+        });
+    }
+
+    [Fact]
+    public async Task CoachMode_CreatesSentCoachingConfirmation()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var tokens = await RegisterAsync(client, "wa-coach@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        await ConfigureNotificationModeAsync(client, "coach");
+
+        using var linkResponse = await client.PostAsJsonAsync(
+            "/api/v1/whatsapp/link",
+            new LinkWhatsAppRequest("+27 82 555 0404", "wa-contact-4"));
+        linkResponse.EnsureSuccessStatusCode();
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var body = """
+            {
+              "messageId": "wamid.789",
+              "platformContactId": "wa-contact-4",
+              "fromPhoneNumber": "+27825550404",
+              "messageType": "text",
+              "text": "R99.95 lunch",
+              "receivedUtc": "2026-06-17T10:00:00Z"
+            }
+            """;
+
+        using var webhookResponse = await PostWebhookAsync(client, body);
+        webhookResponse.EnsureSuccessStatusCode();
+
+        await factory.UseContextAsync(async context =>
+        {
+            var notification = await context.Notifications.SingleAsync();
+
+            Assert.Equal("Sent", notification.Status.ToString());
+            Assert.Equal("TransactionConfirmation", notification.NotificationType.ToString());
+            Assert.DoesNotContain("dashboard", notification.MessageEncrypted, StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     [Fact]
@@ -197,6 +249,23 @@ public sealed class WhatsAppEndpointIntegrationTests
 
         response.EnsureSuccessStatusCode();
         return await ReadAsync<AuthTokenResponse>(response);
+    }
+
+    private static async Task ConfigureNotificationModeAsync(HttpClient client, string notificationMode)
+    {
+        using var response = await client.PutAsJsonAsync(
+            "/api/v1/financial-profile",
+            new FinancialProfileRequest(
+                2500000,
+                25,
+                "paydayToPayday",
+                150000,
+                50000,
+                100000,
+                notificationMode,
+                "Monday"));
+
+        response.EnsureSuccessStatusCode();
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

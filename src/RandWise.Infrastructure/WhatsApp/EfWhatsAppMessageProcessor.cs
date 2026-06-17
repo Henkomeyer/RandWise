@@ -17,6 +17,7 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
     private readonly IClock clock;
     private readonly IDeterministicWhatsAppParser parser;
     private readonly IIdGenerator idGenerator;
+    private readonly IWhatsAppOutboundClient outboundClient;
     private readonly ISensitiveDataProtector protector;
     private readonly ITransactionService transactionService;
 
@@ -25,6 +26,7 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
         IClock clock,
         IDeterministicWhatsAppParser parser,
         IIdGenerator idGenerator,
+        IWhatsAppOutboundClient outboundClient,
         ISensitiveDataProtector protector,
         ITransactionService transactionService)
     {
@@ -32,6 +34,7 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
         this.clock = clock;
         this.parser = parser;
         this.idGenerator = idGenerator;
+        this.outboundClient = outboundClient;
         this.protector = protector;
         this.transactionService = transactionService;
     }
@@ -103,8 +106,48 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
                 "whatsapp"),
             cancellationToken);
 
+        await QueueConfirmationAsync(incoming, parsed, cancellationToken);
         incoming.MarkProcessed(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task QueueConfirmationAsync(
+        IncomingMessage incoming,
+        ParsedWhatsAppMessage parsed,
+        CancellationToken cancellationToken)
+    {
+        var notificationMode = await dbContext.FinancialProfiles
+            .AsNoTracking()
+            .Where(profile => profile.UserId == incoming.UserId)
+            .Select(profile => profile.NotificationMode)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (notificationMode == NotificationMode.Silent)
+        {
+            return;
+        }
+
+        if (notificationMode == default)
+        {
+            notificationMode = NotificationMode.Confirm;
+        }
+
+        var message = notificationMode == NotificationMode.Coach
+            ? $"Added {FormatRand(parsed.AmountInCents!.Value)} for {parsed.Description}. Check your dashboard before the next spend."
+            : $"Added {FormatRand(parsed.AmountInCents!.Value)} for {parsed.Description}.";
+
+        var notification = Notification.Create(
+            idGenerator.NewId(),
+            incoming.UserId!,
+            NotificationChannel.WhatsApp,
+            NotificationType.TransactionConfirmation,
+            protector.Protect(message),
+            clock.UtcNow,
+            clock.UtcNow);
+
+        dbContext.Notifications.Add(notification);
+        await outboundClient.SendTextAsync(incoming.PlatformContactId, message, cancellationToken);
+        notification.MarkSent(clock.UtcNow);
     }
 
     private static TransactionType? ParseTransactionType(string? transactionType) =>
@@ -114,4 +157,10 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
             "income" => TransactionType.Income,
             _ => null
         };
+
+    private static string FormatRand(long cents)
+    {
+        var rand = cents / 100m;
+        return rand % 1 == 0 ? $"R{rand:0}" : $"R{rand:0.00}";
+    }
 }
