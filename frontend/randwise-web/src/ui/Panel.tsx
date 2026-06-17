@@ -15,7 +15,7 @@ export function Panel({
   return (
     <Element
       className={classNames(
-        "rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/80 dark:shadow-none",
+        "rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none",
         className
       )}
       {...props}

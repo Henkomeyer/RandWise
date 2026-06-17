@@ -29,10 +29,10 @@ function AppShellLayout() {
   const auth = useAuth();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#07111f] dark:text-slate-100">
+    <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <SkipLink targetId="main-content">Skip to main content</SkipLink>
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col md:flex-row">
-        <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white px-5 py-6 dark:border-slate-800 dark:bg-slate-950/70 md:block">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col md:flex-row">
+        <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white px-5 py-6 dark:border-slate-800 dark:bg-slate-950 md:block">
           <NavLink
             to="/dashboard"
             className="mb-7 inline-flex min-h-11 items-center rounded-md text-xl font-bold tracking-normal text-emerald-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700 dark:text-emerald-200"
@@ -55,7 +55,7 @@ function AppShellLayout() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
-          <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-[#07111f]/90 md:px-8">
+          <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:px-8">
             <div className="flex min-h-11 items-center justify-between gap-4">
               <NavLink
                 to="/dashboard"
@@ -73,20 +73,29 @@ function AppShellLayout() {
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
+                  aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
                   aria-pressed={isDarkMode}
                   onClick={toggleThemeMode}
-                  variant={isDarkMode ? "primary" : "secondary"}
+                  variant="secondary"
                 >
-                  {isDarkMode ? "Dark" : "Light"}
+                  <span className="sm:hidden">{isDarkMode ? "Light" : "Dark"}</span>
+                  <span className="hidden sm:inline">{isDarkMode ? "Light mode" : "Dark mode"}</span>
                 </Button>
                 <Button
+                  aria-label={isPrivacyMode ? "Turn privacy mode off" : "Turn privacy mode on"}
                   aria-pressed={isPrivacyMode}
                   onClick={togglePrivacyMode}
                   variant={isPrivacyMode ? "primary" : "secondary"}
                 >
-                  Privacy {isPrivacyMode ? "on" : "off"}
+                  <span className="sm:hidden">Privacy</span>
+                  <span className="hidden sm:inline">Privacy {isPrivacyMode ? "on" : "off"}</span>
                 </Button>
-                <Button onClick={() => void auth.logout()} variant="ghost">
+                <Button
+                  aria-label="Sign out"
+                  className="px-3 sm:px-4"
+                  onClick={() => void auth.logout()}
+                  variant="ghost"
+                >
                   Sign out
                 </Button>
               </div>
@@ -126,7 +135,7 @@ function NavItem({ label, to, mobile = false }: NavItemProps) {
           "flex min-h-11 items-center rounded-md text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700",
           mobile ? "justify-center px-2 py-3" : "px-3 py-2.5",
           isActive
-            ? "bg-emerald-950 text-white"
+            ? "bg-emerald-900 text-white dark:bg-emerald-300 dark:text-slate-950"
             : "text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
         )
       }

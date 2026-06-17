@@ -10,9 +10,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "border-emerald-950 bg-emerald-950 text-white hover:bg-emerald-900 dark:border-emerald-300 dark:bg-emerald-300 dark:text-slate-950 dark:hover:bg-emerald-200",
+    "border-emerald-900 bg-emerald-900 text-white hover:bg-emerald-800 dark:border-emerald-300 dark:bg-emerald-300 dark:text-slate-950 dark:hover:bg-emerald-200",
   secondary:
-    "border-slate-300 bg-white text-slate-800 shadow-sm hover:border-emerald-700 hover:text-emerald-950 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-emerald-300 dark:hover:text-emerald-100",
+    "border-slate-300 bg-white text-slate-800 shadow-sm hover:border-emerald-700 hover:text-emerald-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-emerald-300 dark:hover:text-emerald-100",
   ghost:
     "border-transparent bg-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
 };

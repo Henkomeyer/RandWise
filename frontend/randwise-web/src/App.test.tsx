@@ -111,7 +111,7 @@ describe("RandWise app shell", () => {
 
     renderShell("/budget");
 
-    expect(await screen.findByRole("heading", { name: /budget command center/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Budget" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /category groups/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /recurring commitments/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /saving targets/i })).toBeInTheDocument();
@@ -237,10 +237,10 @@ describe("RandWise app shell", () => {
 
     expect(screen.getByText("R2,840")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /privacy off/i }));
+    fireEvent.click(screen.getByRole("button", { name: /turn privacy mode on/i }));
 
     expect(screen.queryByText("R2,840")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /privacy on/i })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /turn privacy mode off/i })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
@@ -250,10 +250,10 @@ describe("RandWise app shell", () => {
   it("toggles the persisted dark theme", () => {
     renderShell();
 
-    fireEvent.click(screen.getByRole("button", { name: /light/i }));
+    fireEvent.click(screen.getByRole("button", { name: /switch to dark mode/i }));
 
     expect(document.documentElement).toHaveClass("dark");
-    expect(screen.getByRole("button", { name: /dark/i })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /switch to light mode/i })).toHaveAttribute(
       "aria-pressed",
       "true"
     );

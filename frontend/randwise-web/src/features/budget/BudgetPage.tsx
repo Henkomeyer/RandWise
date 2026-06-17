@@ -22,6 +22,13 @@ type Target = {
   savedInCents: number;
 };
 
+type BudgetGroup = {
+  title: string;
+  detail: string;
+  tone: "emerald" | "cyan" | "amber";
+  budgets: CategoryBudget[];
+};
+
 const targetStorageKey = "randwise.targets";
 
 export function BudgetPage() {
@@ -33,22 +40,42 @@ export function BudgetPage() {
   const [safeToSpend, setSafeToSpend] = useState<SafeToSpend | null>(null);
   const [targets, setTargets] = useState<Target[]>(() => readTargets());
   const [periodForm, setPeriodForm] = useState(() => createPeriodForm());
-  const [categoryForm, setCategoryForm] = useState({ name: "", categoryType: "expense", icon: "tag" });
-  const [budgetForm, setBudgetForm] = useState({ categoryId: "", allocatedAmountCents: "", warningThresholdPercent: "80" });
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    categoryType: "expense",
+    icon: "tag"
+  });
+  const [budgetForm, setBudgetForm] = useState({
+    categoryId: "",
+    allocatedAmountCents: "",
+    warningThresholdPercent: "80"
+  });
   const [recurringForm, setRecurringForm] = useState(() => createRecurringForm());
-  const [targetForm, setTargetForm] = useState({ name: "", cadence: "weekly", targetInCents: "", savedInCents: "" });
+  const [targetForm, setTargetForm] = useState({
+    name: "",
+    cadence: "weekly",
+    targetInCents: "",
+    savedInCents: ""
+  });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedPeriod = periods.find((period) => period.status === "open") ?? periods[0] ?? null;
   const expenseCategories = categories.filter((category) => category.categoryType !== "income");
-  const totalAllocated = categoryBudgets.reduce((sum, budget) => sum + budget.allocatedAmountCents + budget.rolloverAmountCents, 0);
+  const totalAllocated = categoryBudgets.reduce(
+    (sum, budget) => sum + budget.allocatedAmountCents + budget.rolloverAmountCents,
+    0
+  );
   const totalSpent = categoryBudgets.reduce((sum, budget) => sum + budget.spentAmountCents, 0);
-  const targetPoints = targets.reduce((sum, target) => sum + Math.min(100, getPercent(target.savedInCents, target.targetInCents)), 0);
+  const remainingAllocated = Math.max(0, totalAllocated - totalSpent);
+  const targetPoints = targets.reduce(
+    (sum, target) => sum + Math.min(100, getPercent(target.savedInCents, target.targetInCents)),
+    0
+  );
   const level = Math.max(1, Math.floor(targetPoints / 120) + 1);
 
-  const groupedBudgets = useMemo(() => {
+  const groupedBudgets = useMemo<BudgetGroup[]>(() => {
     const essentials = categoryBudgets.filter((budget) =>
       /groceries|transport|rent|utilities|home/i.test(budget.categoryName)
     );
@@ -62,9 +89,24 @@ export function BudgetPage() {
     const saving = categoryBudgets.filter((budget) => !assignedIds.has(budget.id));
 
     return [
-      { title: "Essentials", tone: "emerald", budgets: essentials },
-      { title: "Lifestyle", tone: "cyan", budgets: lifestyle },
-      { title: "Saving", tone: "amber", budgets: saving }
+      {
+        title: "Essentials",
+        detail: "Rent, groceries, transport and unavoidable monthly costs.",
+        tone: "emerald",
+        budgets: essentials
+      },
+      {
+        title: "Lifestyle",
+        detail: "Flexible spend where pacing makes the biggest difference.",
+        tone: "cyan",
+        budgets: lifestyle
+      },
+      {
+        title: "Saving",
+        detail: "Buffers, goals and categories not assigned elsewhere.",
+        tone: "amber",
+        budgets: saving
+      }
     ];
   }, [categoryBudgets]);
 
@@ -267,39 +309,61 @@ export function BudgetPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="overflow-hidden rounded-lg border border-emerald-900/10 bg-slate-950 text-white shadow-sm dark:border-emerald-300/20">
-          <div className="p-5 md:p-7">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold">Budget command center</h1>
-              <StatusBadge tone="success">Level {level}</StatusBadge>
+    <div className="space-y-6">
+      <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-950 dark:text-slate-100">Budget</h1>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Keep period plans, category limits, fixed commitments and saving targets in one reliable control view.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone="success">Level {level}</StatusBadge>
+          {selectedPeriod ? <StatusBadge tone="neutral">{selectedPeriod.daysRemaining} days left</StatusBadge> : null}
+        </div>
+      </section>
+
+      {error ? (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm font-semibold text-rose-800 dark:border-rose-300/30 dark:bg-rose-300/10 dark:text-rose-100">
+          {error}
+        </div>
+      ) : null}
+
+      <section aria-label="Budget summary" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="Safe to spend" value={<MoneyText amountInCents={safeToSpend?.amountInCents ?? 0} />} detail={`${safeToSpend?.daysRemaining ?? selectedPeriod?.daysRemaining ?? 0} days in this plan`} />
+        <SummaryCard label="Protected cash" value={<MoneyText amountInCents={safeToSpend?.protectedAmountInCents ?? 0} />} detail="Buffer, savings and upcoming commitments" />
+        <SummaryCard label="Category room" value={<MoneyText amountInCents={remainingAllocated} />} detail={`${getPercent(totalSpent, totalAllocated)}% of allocated budget used`} />
+        <SummaryCard label="Target progress" value={`${targetPoints} XP`} detail={`${targets.length} weekly or monthly goals`} />
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-950 dark:text-slate-100">Category groups</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Review the plan by spending type before changing limits.
+              </p>
             </div>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50">
-              Group spending categories, protect fixed commitments and pace weekly or monthly saving targets.
-            </p>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              <Metric label="Safe to spend" value={<MoneyText amountInCents={safeToSpend?.amountInCents ?? 0} />} />
-              <Metric label="Allocated" value={<MoneyText amountInCents={totalAllocated} />} />
-              <Metric label="Spent" value={<MoneyText amountInCents={totalSpent} />} />
-            </div>
+            <StatusBadge tone="neutral">{categoryBudgets.length} budgets</StatusBadge>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {groupedBudgets.map((group) => (
+              <BudgetGroupPanel key={group.title} group={group} />
+            ))}
           </div>
         </div>
 
-        <Panel aria-labelledby="period-heading">
+        <Panel aria-labelledby="period-heading" className="self-start">
           <h2 id="period-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
-            Current period
+            Plan period
           </h2>
           {selectedPeriod ? (
-            <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-400">
-              <p className="font-semibold text-slate-950 dark:text-slate-100">
-                {selectedPeriod.startDate} to {selectedPeriod.endDate}
-              </p>
-              <p>{selectedPeriod.daysRemaining} days remaining</p>
-              <p>
-                Expected income <MoneyText amountInCents={selectedPeriod.expectedIncomeCents} />
-              </p>
-            </div>
+            <dl className="mt-4 grid gap-3 text-sm">
+              <InfoRow label="Dates" value={`${selectedPeriod.startDate} to ${selectedPeriod.endDate}`} />
+              <InfoRow label="Expected income" value={<MoneyText amountInCents={selectedPeriod.expectedIncomeCents} />} />
+              <InfoRow label="Opening balance" value={<MoneyText amountInCents={selectedPeriod.openingBalanceCents} />} />
+            </dl>
           ) : null}
           <form className="mt-5 grid gap-3" onSubmit={createPeriod}>
             <Field label="Start date" type="date" value={periodForm.startDate} onChange={(value) => setPeriodForm((current) => ({ ...current, startDate: value }))} />
@@ -313,46 +377,20 @@ export function BudgetPage() {
         </Panel>
       </section>
 
-      {error ? (
-        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm font-semibold text-rose-800 dark:border-rose-300/30 dark:bg-rose-300/10 dark:text-rose-100">
-          {error}
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div>
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Panel aria-labelledby="budget-form-heading">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-950 dark:text-slate-100">
-                Category groups
+              <h2 id="budget-form-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
+                Set category budget
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Budgets are grouped by essentials, lifestyle and saving intent.
+                Add a limit to the active period without changing transaction history.
               </p>
             </div>
-            <StatusBadge tone="neutral">{categoryBudgets.length} budgets</StatusBadge>
+            <StatusBadge tone="neutral">{expenseCategories.length} categories</StatusBadge>
           </div>
-          <div className="mt-4 grid gap-4 xl:grid-cols-3">
-            {groupedBudgets.map((group) => (
-              <Panel key={group.title} as="article">
-                <h3 className="text-base font-bold text-slate-950 dark:text-slate-100">{group.title}</h3>
-                <div className="mt-4 space-y-4">
-                  {group.budgets.length === 0 ? (
-                    <p className="text-sm text-slate-600 dark:text-slate-400">No budgets yet.</p>
-                  ) : (
-                    group.budgets.map((budget) => <BudgetRow key={budget.id} budget={budget} tone={group.tone} />)
-                  )}
-                </div>
-              </Panel>
-            ))}
-          </div>
-        </div>
-
-        <Panel aria-labelledby="budget-form-heading">
-          <h2 id="budget-form-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
-            Add budget
-          </h2>
-          <form className="mt-5 space-y-4" onSubmit={createCategoryBudget}>
+          <form className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px_auto] md:items-end" onSubmit={createCategoryBudget}>
             <Select label="Category" value={budgetForm.categoryId} onChange={(value) => setBudgetForm((current) => ({ ...current, categoryId: value }))}>
               {expenseCategories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -361,18 +399,16 @@ export function BudgetPage() {
               ))}
             </Select>
             <Field label="Allocated amount cents" type="number" value={budgetForm.allocatedAmountCents} onChange={(value) => setBudgetForm((current) => ({ ...current, allocatedAmountCents: value }))} />
-            <Field label="Warning threshold %" type="number" value={budgetForm.warningThresholdPercent} onChange={(value) => setBudgetForm((current) => ({ ...current, warningThresholdPercent: value }))} />
+            <Field label="Warning %" type="number" value={budgetForm.warningThresholdPercent} onChange={(value) => setBudgetForm((current) => ({ ...current, warningThresholdPercent: value }))} />
             <Button type="submit" variant="primary" disabled={isSubmitting || !selectedPeriod}>
               Save budget
             </Button>
           </form>
         </Panel>
-      </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
         <Panel aria-labelledby="category-form-heading">
           <h2 id="category-form-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
-            Categories
+            New category
           </h2>
           <form className="mt-5 space-y-4" onSubmit={createCategory}>
             <Field label="Category name" value={categoryForm.name} onChange={(value) => setCategoryForm((current) => ({ ...current, name: value }))} />
@@ -382,17 +418,27 @@ export function BudgetPage() {
               <option value="savings">Savings</option>
             </Select>
             <Field label="Icon keyword" value={categoryForm.icon} onChange={(value) => setCategoryForm((current) => ({ ...current, icon: value }))} required={false} />
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
+            <Button type="submit" variant="secondary" disabled={isSubmitting}>
               Add category
             </Button>
           </form>
         </Panel>
+      </section>
 
+      <section className="grid gap-5 lg:grid-cols-2">
         <Panel aria-labelledby="recurring-heading">
-          <h2 id="recurring-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
-            Recurring commitments
-          </h2>
-          <form className="mt-5 space-y-4" onSubmit={createRecurring}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 id="recurring-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
+                Recurring commitments
+              </h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Fixed costs are protected before flexible spending is calculated.
+              </p>
+            </div>
+            <StatusBadge tone="neutral">{recurring.filter((item) => item.isActive).length} active</StatusBadge>
+          </div>
+          <form className="mt-5 grid gap-4 md:grid-cols-2" onSubmit={createRecurring}>
             <Select label="Category" value={recurringForm.categoryId} onChange={(value) => setRecurringForm((current) => ({ ...current, categoryId: value }))}>
               {expenseCategories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -407,17 +453,19 @@ export function BudgetPage() {
               <option value="monthly">Monthly</option>
             </Select>
             <Field label="Next date" type="date" value={recurringForm.nextOccurrenceDate} onChange={(value) => setRecurringForm((current) => ({ ...current, nextOccurrenceDate: value }))} />
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
-              Add commitment
-            </Button>
+            <div className="flex items-end">
+              <Button type="submit" variant="primary" disabled={isSubmitting}>
+                Add commitment
+              </Button>
+            </div>
           </form>
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 divide-y divide-slate-200 dark:divide-slate-800">
             {recurring.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 border-t border-slate-200 pt-3 first:border-t-0 first:pt-0 dark:border-slate-700">
+              <div key={item.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div>
                   <p className="font-semibold text-slate-950 dark:text-slate-100">{item.description}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    <MoneyText amountInCents={item.amountInCents} /> {item.frequency}
+                    <MoneyText amountInCents={item.amountInCents} /> every {item.frequency}
                   </p>
                 </div>
                 {item.isActive ? (
@@ -433,13 +481,18 @@ export function BudgetPage() {
         </Panel>
 
         <Panel aria-labelledby="targets-heading">
-          <div className="flex items-start justify-between gap-3">
-            <h2 id="targets-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
-              Saving targets
-            </h2>
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 id="targets-heading" className="text-lg font-bold text-slate-950 dark:text-slate-100">
+                Saving targets
+              </h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Track weekly and monthly targets locally while the backend contract stays stable.
+              </p>
+            </div>
             <StatusBadge tone="success">{targetPoints} XP</StatusBadge>
           </div>
-          <form className="mt-5 space-y-4" onSubmit={createTarget}>
+          <form className="mt-5 grid gap-4 md:grid-cols-2" onSubmit={createTarget}>
             <Field label="Target name" value={targetForm.name} onChange={(value) => setTargetForm((current) => ({ ...current, name: value }))} />
             <Select label="Cadence" value={targetForm.cadence} onChange={(value) => setTargetForm((current) => ({ ...current, cadence: value }))}>
               <option value="weekly">Weekly</option>
@@ -447,9 +500,11 @@ export function BudgetPage() {
             </Select>
             <Field label="Target cents" type="number" value={targetForm.targetInCents} onChange={(value) => setTargetForm((current) => ({ ...current, targetInCents: value }))} />
             <Field label="Saved cents" type="number" value={targetForm.savedInCents} onChange={(value) => setTargetForm((current) => ({ ...current, savedInCents: value }))} required={false} />
-            <Button type="submit" variant="primary">
-              Add target
-            </Button>
+            <div className="md:col-span-2">
+              <Button type="submit" variant="primary">
+                Add target
+              </Button>
+            </div>
           </form>
           <div className="mt-5 space-y-4">
             {targets.map((target) => (
@@ -466,11 +521,46 @@ export function BudgetPage() {
   );
 }
 
-function BudgetRow({ budget, tone }: { budget: CategoryBudget; tone: string }) {
+function BudgetGroupPanel({ group }: { group: BudgetGroup }) {
+  const allocated = group.budgets.reduce(
+    (sum, budget) => sum + budget.allocatedAmountCents + budget.rolloverAmountCents,
+    0
+  );
+  const spent = group.budgets.reduce((sum, budget) => sum + budget.spentAmountCents, 0);
+  const percent = getPercent(spent, allocated);
+
+  return (
+    <Panel as="article" className="flex min-h-64 flex-col">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-950 dark:text-slate-100">{group.title}</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">{group.detail}</p>
+        </div>
+        <StatusBadge tone={percent > 85 ? "warning" : "success"}>{percent}%</StatusBadge>
+      </div>
+      <Progress value={percent} tone={group.tone} />
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <InfoBlock label="Allocated" value={<MoneyText amountInCents={allocated} />} />
+        <InfoBlock label="Spent" value={<MoneyText amountInCents={spent} />} />
+      </div>
+      <div className="mt-5 flex-1 space-y-4">
+        {group.budgets.length === 0 ? (
+          <p className="rounded-md border border-dashed border-slate-300 p-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-400">
+            No budgets yet.
+          </p>
+        ) : (
+          group.budgets.map((budget) => <BudgetRow key={budget.id} budget={budget} tone={group.tone} />)
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function BudgetRow({ budget, tone }: { budget: CategoryBudget; tone: BudgetGroup["tone"] }) {
   const total = budget.allocatedAmountCents + budget.rolloverAmountCents;
   const percent = getPercent(budget.spentAmountCents, total);
   return (
-    <article>
+    <article className="rounded-md border border-slate-200 p-3 dark:border-slate-800">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-semibold text-slate-950 dark:text-slate-100">{budget.categoryName}</p>
@@ -482,7 +572,7 @@ function BudgetRow({ budget, tone }: { budget: CategoryBudget; tone: string }) {
           {percent}%
         </StatusBadge>
       </div>
-      <Progress value={percent} tone={tone} />
+      <Progress value={percent} tone={tone} compact />
     </article>
   );
 }
@@ -490,35 +580,74 @@ function BudgetRow({ budget, tone }: { budget: CategoryBudget; tone: string }) {
 function TargetRow({ target }: { target: Target }) {
   const percent = getPercent(target.savedInCents, target.targetInCents);
   return (
-    <article className="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0 dark:border-slate-700">
+    <article className="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0 dark:border-slate-800">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-semibold text-slate-950 dark:text-slate-100">{target.name}</p>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {target.cadence} goal
-          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{target.cadence} goal</p>
         </div>
         <p className="text-sm font-bold text-slate-950 dark:text-slate-100">{percent}%</p>
       </div>
-      <Progress value={percent} tone={target.cadence === "weekly" ? "cyan" : "amber"} />
+      <Progress value={percent} tone={target.cadence === "weekly" ? "cyan" : "amber"} compact />
     </article>
   );
 }
 
-function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+function SummaryCard({
+  label,
+  value,
+  detail
+}: {
+  label: string;
+  value: React.ReactNode;
+  detail: string;
+}) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/10 p-4">
-      <p className="text-sm font-medium text-slate-300">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+    <Panel as="article">
+      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-950 dark:text-slate-100">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{detail}</p>
+    </Panel>
+  );
+}
+
+function InfoBlock({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-md bg-slate-50 p-3 dark:bg-slate-950/70">
+      <p className="text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 font-bold text-slate-950 dark:text-slate-100">{value}</p>
     </div>
   );
 }
 
-function Progress({ value, tone }: { value: number; tone: string }) {
-  const color = tone === "cyan" ? "bg-cyan-400" : tone === "amber" ? "bg-amber-300" : "bg-emerald-300";
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-slate-800">
-      <div className={classNames("h-2 rounded-full", color)} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+    <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 last:border-b-0 last:pb-0 dark:border-slate-800">
+      <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
+      <dd className="text-right font-semibold text-slate-950 dark:text-slate-100">{value}</dd>
+    </div>
+  );
+}
+
+function Progress({
+  value,
+  tone,
+  compact = false
+}: {
+  value: number;
+  tone: BudgetGroup["tone"];
+  compact?: boolean;
+}) {
+  const color =
+    tone === "cyan" ? "bg-cyan-500 dark:bg-cyan-300" : tone === "amber" ? "bg-amber-500 dark:bg-amber-300" : "bg-emerald-600 dark:bg-emerald-300";
+  return (
+    <div className={classNames("rounded-full bg-slate-100 dark:bg-slate-800", compact ? "mt-3 h-1.5" : "mt-4 h-2")}>
+      <div
+        className={classNames("rounded-full", color, compact ? "h-1.5" : "h-2")}
+        style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+      />
     </div>
   );
 }
@@ -540,7 +669,7 @@ function Field({
     <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
       {label}
       <input
-        className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+        className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 shadow-sm shadow-slate-200/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:shadow-none"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
@@ -565,7 +694,7 @@ function Select({
     <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
       {label}
       <select
-        className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+        className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 shadow-sm shadow-slate-200/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:shadow-none"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
