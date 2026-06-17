@@ -122,6 +122,89 @@ export type SafeToSpend = {
   daysRemaining: number;
 };
 
+export type DashboardSummary = {
+  generatedUtc: string;
+  budgetPeriod: {
+    id: string;
+    startDate: string;
+    endDate: string;
+    daysRemaining: number;
+    periodProgressPercent: number;
+  };
+  financialStatus: {
+    status: string;
+    message: string;
+    moneyPulse: number;
+  };
+  safeToSpend: {
+    amountInCents: number;
+    dailyAmountInCents: number;
+    availableCashInCents: number;
+    protectedAmountInCents: number;
+    safetyBufferInCents: number;
+  };
+  spending: {
+    spentThisPeriodInCents: number;
+    spendingPercent: number;
+    expectedSpendingPercent: number;
+  };
+  recommendedAction: {
+    type: string;
+    title: string;
+    message: string;
+  };
+  categories: DashboardCategoryProgress[];
+  upcomingCommitments: DashboardUpcomingCommitment[];
+  recentTransactions: DashboardRecentTransaction[];
+  cashFlowForecast: DashboardCashFlowPoint[];
+  insights: DashboardInsight[];
+};
+
+export type DashboardCategoryProgress = {
+  categoryId: string;
+  name: string;
+  allocatedInCents: number;
+  spentInCents: number;
+  remainingInCents: number;
+  spendingPercent: number;
+  status: string;
+  latestTransaction: string | null;
+};
+
+export type DashboardUpcomingCommitment = {
+  id: string;
+  description: string;
+  dueDate: string;
+  amountInCents: number;
+  isProtected: boolean;
+  status: string;
+};
+
+export type DashboardRecentTransaction = {
+  id: string;
+  description: string;
+  merchant: string | null;
+  categoryName: string;
+  transactionDate: string;
+  amountInCents: number;
+  transactionType: "expense" | "income";
+  source: string;
+  status: string;
+};
+
+export type DashboardCashFlowPoint = {
+  date: string;
+  projectedBalanceInCents: number;
+  commitmentAmountInCents: number;
+  isPayday: boolean;
+};
+
+export type DashboardInsight = {
+  type: string;
+  title: string;
+  message: string;
+};
+
 export type PagedResponse<T> = {
   items: T[];
   page: number;
@@ -396,7 +479,11 @@ export const api = {
       ? demoApi.getSafeToSpend(accessToken)
       : apiRequest<SafeToSpend>("/dashboard/safe-to-spend", {
           accessToken
-        })
+        }),
+  getDashboard: (accessToken: string) =>
+    IS_DEMO_MODE
+      ? demoApi.getDashboard(accessToken)
+      : apiRequest<DashboardSummary>("/dashboard", { accessToken })
 };
 
 const demoApi = {
@@ -709,6 +796,96 @@ const demoApi = {
       dailyAmountInCents: period.daysRemaining > 0 ? Math.floor(amount / period.daysRemaining) : 0,
       daysRemaining: period.daysRemaining
     };
+  },
+  async getDashboard(accessToken: string): Promise<DashboardSummary> {
+    void accessToken;
+    const period = readDemoBudgetPeriods()[0];
+    const budgets = readDemoCategoryBudgets().filter((budget) => budget.budgetPeriodId === period.id);
+    const recurring = readDemoRecurringTransactions().filter((item) => item.isActive);
+    const safe = await this.getSafeToSpend("demo");
+    const spent = budgets.reduce((sum, budget) => sum + budget.spentAmountCents, 0);
+    const allocated = budgets.reduce(
+      (sum, budget) => sum + budget.allocatedAmountCents + budget.rolloverAmountCents,
+      0
+    );
+
+    return {
+      generatedUtc: new Date().toISOString(),
+      budgetPeriod: {
+        id: period.id,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        daysRemaining: period.daysRemaining,
+        periodProgressPercent: 48
+      },
+      financialStatus: {
+        status: "onTrack",
+        message: "You are currently on track.",
+        moneyPulse: 76
+      },
+      safeToSpend: {
+        amountInCents: safe.amountInCents,
+        dailyAmountInCents: safe.dailyAmountInCents,
+        availableCashInCents: safe.availableCashInCents,
+        protectedAmountInCents: safe.protectedAmountInCents,
+        safetyBufferInCents: safe.safetyBufferInCents
+      },
+      spending: {
+        spentThisPeriodInCents: spent,
+        spendingPercent: allocated > 0 ? Math.round((spent / allocated) * 100) : 0,
+        expectedSpendingPercent: 48
+      },
+      recommendedAction: {
+        type: "onTrack",
+        title: "Keep the current pace",
+        message: "Safe-to-spend is positive and your category usage is aligned with the month."
+      },
+      categories: budgets.map((budget) => ({
+        categoryId: budget.categoryId,
+        name: budget.categoryName,
+        allocatedInCents: budget.allocatedAmountCents + budget.rolloverAmountCents,
+        spentInCents: budget.spentAmountCents,
+        remainingInCents: Math.max(0, budget.allocatedAmountCents + budget.rolloverAmountCents - budget.spentAmountCents),
+        spendingPercent:
+          budget.allocatedAmountCents > 0
+            ? Math.round((budget.spentAmountCents / (budget.allocatedAmountCents + budget.rolloverAmountCents)) * 100)
+            : 0,
+        status: "onTrack",
+        latestTransaction: null
+      })),
+      upcomingCommitments: recurring.map((item) => ({
+        id: item.id,
+        description: item.description,
+        dueDate: item.nextOccurrenceDate,
+        amountInCents: item.amountInCents,
+        isProtected: true,
+        status: "protected"
+      })),
+      recentTransactions: readDemoTransactions().slice(0, 6).map((transaction) => ({
+        id: transaction.id,
+        description: transaction.description,
+        merchant: transaction.merchant,
+        categoryName: readDemoCategories().find((category) => category.id === transaction.categoryId)?.name ?? "Uncategorised",
+        transactionDate: transaction.transactionDate,
+        amountInCents: transaction.amountInCents,
+        transactionType: transaction.transactionType,
+        source: transaction.source,
+        status: transaction.status
+      })),
+      cashFlowForecast: Array.from({ length: Math.min(10, period.daysRemaining) }, (_, index) => ({
+        date: addDays(new Date().toISOString().slice(0, 10), index),
+        projectedBalanceInCents: safe.availableCashInCents - recurring.reduce((sum, item) => sum + (index === 3 ? item.amountInCents : 0), 0),
+        commitmentAmountInCents: index === 3 ? recurring.reduce((sum, item) => sum + item.amountInCents, 0) : 0,
+        isPayday: index === period.daysRemaining - 1
+      })),
+      insights: [
+        {
+          type: "commitments",
+          title: "Upcoming commitments are protected",
+          message: `${recurring.length} active commitment entries are reserved before flexible spending.`
+        }
+      ]
+    };
   }
 };
 
@@ -932,4 +1109,10 @@ function dayDiff(from: string, to: string) {
   const fromDate = new Date(`${from}T00:00:00Z`);
   const toDate = new Date(`${to}T00:00:00Z`);
   return Math.floor((toDate.getTime() - fromDate.getTime()) / 86400000);
+}
+
+function addDays(from: string, days: number) {
+  const date = new Date(`${from}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }

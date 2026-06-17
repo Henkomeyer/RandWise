@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 3 budgeting complete. Wave 4 dashboard is ready to start.
+Wave 4 dashboard is in progress. The composite dashboard API and live frontend connection are complete.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -18,7 +18,7 @@ Actual repository state:
 | 1 Domain/platform foundation | Complete | Passed |
 | 2 First vertical slice | Complete | Passed |
 | 3 Budgeting | Complete | Passed |
-| 4 Dashboard | Not started | Pending |
+| 4 Dashboard | In progress | Pending |
 | 5 WhatsApp capture | Not started | Pending |
 | 6 Intelligence/jobs | Not started | Pending |
 | 7 Reports/privacy | Not started | Pending |
@@ -167,6 +167,24 @@ Actual repository state:
 - `npm run build` passed.
 - `VITE_DEMO_MODE=true npm run build` passed.
 - `npm run test:e2e` is not available yet.
+
+### Wave 4 dashboard checkpoint
+
+- RW-401 dashboard composite API complete for `/api/v1/dashboard`.
+- RW-402 Money Pulse and spending pace complete as MVP backend calculations.
+- RW-403 cash-flow forecast complete as a 14-day projected balance read model.
+- RW-404 recommended action engine complete as deterministic MVP priority logic.
+- RW-405 dashboard frontend structure expanded beyond fixture-only layout.
+- RW-406 dashboard live API connection complete with demo fallback.
+- App shell width cap removed so desktop uses the full available browser width.
+- Browser verification passed for `1920x1080` desktop and `390x844` dark-mode mobile with no horizontal overflow.
+- Remaining Wave 4 work: RW-407 calculation breakdown/privacy-specific dashboard treatment, RW-408 accessibility/responsive test expansion and RW-409 acceptance gate.
+- `dotnet test RandWise.sln` passed with 36 tests.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed with 8 tests.
+- `npm run build` passed.
+- `VITE_DEMO_MODE=true npm run build` passed.
 
 ## Open decisions
 

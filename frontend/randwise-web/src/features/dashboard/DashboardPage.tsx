@@ -1,4 +1,7 @@
-import { dashboardFixture, type CategoryGroup, type SavingsTarget } from "./dashboardFixture";
+import { useEffect, useState } from "react";
+import { dashboardFixture, type CategoryGroup, type DashboardSummary as DashboardViewModel, type SavingsTarget } from "./dashboardFixture";
+import { api, type DashboardSummary as LiveDashboardSummary } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../ui/Button";
 import { MoneyText } from "../../ui/MoneyText";
 import { Panel } from "../../ui/Panel";
@@ -13,24 +16,71 @@ const accentClasses: Record<CategoryGroup["accent"], string> = {
 };
 
 export function DashboardPage() {
-  const dashboard = dashboardFixture;
+  const auth = useAuth();
+  const [liveDashboard, setLiveDashboard] = useState<LiveDashboardSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const dashboard = liveDashboard ? toViewModel(liveDashboard) : dashboardFixture;
   const pointsPercent = getPercent(
     dashboard.gamePlan.points,
     dashboard.gamePlan.nextLevelPoints
   );
 
+  useEffect(() => {
+    if (!auth.tokens) {
+      return;
+    }
+
+    let isActive = true;
+    async function loadDashboard(accessToken: string) {
+      try {
+        const nextDashboard = await api.getDashboard(accessToken);
+        if (isActive) {
+          setLiveDashboard(nextDashboard);
+          setError(null);
+        }
+      } catch (cause) {
+        if (isActive) {
+          setError(cause instanceof Error ? cause.message : "Could not load dashboard.");
+        }
+      }
+    }
+
+    void loadDashboard(auth.tokens.accessToken);
+
+    return () => {
+      isActive = false;
+    };
+  }, [auth.tokens]);
+
   return (
     <div className="space-y-5">
-      <section
-        aria-labelledby="safe-to-spend-heading"
-        className="overflow-hidden rounded-lg border border-emerald-900/10 bg-slate-950 text-white shadow-sm dark:border-emerald-300/20 dark:bg-slate-950"
-      >
-        <div className="grid gap-5 p-5 md:p-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-end">
+      <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-950 dark:text-slate-100">
+            Dashboard
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Your financial control centre for safe spending, payday pressure and the next required action.
+          </p>
+        </div>
+        <StatusBadge tone={error ? "warning" : "success"}>
+          {error ? "Using fallback" : "Live plan"}
+        </StatusBadge>
+      </section>
+
+      {error ? (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-950 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100">
+          {error}
+        </div>
+      ) : null}
+
+      <section aria-labelledby="safe-to-spend-heading" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Panel className="bg-white dark:bg-slate-900">
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1
                 id="safe-to-spend-heading"
-                className="text-base font-semibold text-emerald-100"
+                className="text-base font-semibold text-slate-600 dark:text-slate-300"
               >
                 Safe to spend
               </h1>
@@ -40,27 +90,28 @@ export function DashboardPage() {
                   : dashboard.financialStatus.status}
               </StatusBadge>
             </div>
-            <p className="mt-3 text-4xl font-bold tracking-normal md:text-5xl">
+            <p className="mt-3 text-4xl font-bold tracking-normal text-slate-950 dark:text-slate-100 md:text-5xl">
               <MoneyText amountInCents={dashboard.safeToSpend.amountInCents} />
             </p>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-emerald-50">
+            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
               <MoneyText amountInCents={dashboard.safeToSpend.dailyAmountInCents} /> per
               day for {dashboard.budgetPeriod.daysRemaining} days. Protected cash is{" "}
               <MoneyText amountInCents={dashboard.safeToSpend.protectedAmountInCents} />.
             </p>
           </div>
+        </Panel>
 
-          <div className="rounded-lg border border-white/10 bg-white/10 p-4">
+        <Panel>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-slate-300">Money Pulse</p>
-                <p className="mt-1 text-3xl font-bold">{dashboard.financialStatus.moneyPulse}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Money Pulse</p>
+                <p className="mt-1 text-3xl font-bold text-slate-950 dark:text-slate-100">{dashboard.financialStatus.moneyPulse}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-slate-300">
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                   Level {dashboard.gamePlan.level}
                 </p>
-                <p className="mt-1 text-lg font-bold text-emerald-100">
+                <p className="mt-1 text-lg font-bold text-emerald-900 dark:text-emerald-200">
                   {dashboard.gamePlan.title}
                 </p>
               </div>
@@ -71,11 +122,10 @@ export function DashboardPage() {
               className="mt-4 bg-white/15"
               fillClassName="bg-emerald-300"
             />
-            <p className="mt-3 text-sm text-slate-300">
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
               {dashboard.gamePlan.points} / {dashboard.gamePlan.nextLevelPoints} XP
             </p>
-          </div>
-        </div>
+        </Panel>
       </section>
 
       <section aria-label="Budget status summary" className="grid gap-4 md:grid-cols-3">
@@ -109,6 +159,56 @@ export function DashboardPage() {
           </div>
           <Button variant="secondary">Set weekly cap</Button>
         </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Panel aria-labelledby="cash-flow-heading">
+          <h2 id="cash-flow-heading" className="text-xl font-bold text-slate-950 dark:text-slate-100">
+            Cash-flow forecast
+          </h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Projected balance after protected commitments.
+          </p>
+          <div className="mt-5 grid gap-2">
+            {liveDashboard?.cashFlowForecast.slice(0, 7).map((point) => (
+              <div key={point.date} className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 text-sm">
+                <span className="font-medium text-slate-600 dark:text-slate-400">{point.date.slice(5)}</span>
+                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-2 rounded-full bg-emerald-600 dark:bg-emerald-300"
+                    style={{ width: `${Math.min(100, Math.max(8, getPercent(point.projectedBalanceInCents, dashboard.safeToSpend.availableCashInCents)))}%` }}
+                  />
+                </div>
+                <MoneyText amountInCents={point.projectedBalanceInCents} className="font-semibold text-slate-950 dark:text-slate-100" />
+              </div>
+            )) ?? (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Forecast appears after the live dashboard loads.
+              </p>
+            )}
+          </div>
+        </Panel>
+
+        <Panel aria-labelledby="commitments-heading">
+          <h2 id="commitments-heading" className="text-xl font-bold text-slate-950 dark:text-slate-100">
+            Upcoming commitments
+          </h2>
+          <div className="mt-4 divide-y divide-slate-200 dark:divide-slate-800">
+            {liveDashboard?.upcomingCommitments.length ? (
+              liveDashboard.upcomingCommitments.map((commitment) => (
+                <div key={commitment.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <div>
+                    <p className="font-semibold text-slate-950 dark:text-slate-100">{commitment.description}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Due {commitment.dueDate}</p>
+                  </div>
+                  <MoneyText amountInCents={commitment.amountInCents} className="font-bold text-slate-950 dark:text-slate-100" />
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-400">No protected commitments before payday.</p>
+            )}
+          </div>
+        </Panel>
       </section>
 
       <section aria-labelledby="category-groups-heading">
@@ -176,8 +276,86 @@ export function DashboardPage() {
           </Button>
         </Panel>
       </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Panel aria-labelledby="recent-heading">
+          <h2 id="recent-heading" className="text-xl font-bold text-slate-950 dark:text-slate-100">
+            Recent transactions
+          </h2>
+          <div className="mt-4 divide-y divide-slate-200 dark:divide-slate-800">
+            {liveDashboard?.recentTransactions.length ? (
+              liveDashboard.recentTransactions.map((transaction) => (
+                <div key={transaction.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <div>
+                    <p className="font-semibold text-slate-950 dark:text-slate-100">{transaction.description}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {transaction.categoryName} - {transaction.transactionDate}
+                    </p>
+                  </div>
+                  <MoneyText
+                    amountInCents={transaction.transactionType === "expense" ? -transaction.amountInCents : transaction.amountInCents}
+                    className="font-bold text-slate-950 dark:text-slate-100"
+                  />
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-400">No recent transactions yet.</p>
+            )}
+          </div>
+        </Panel>
+
+        <Panel aria-labelledby="insights-heading">
+          <h2 id="insights-heading" className="text-xl font-bold text-slate-950 dark:text-slate-100">
+            Insights
+          </h2>
+          <div className="mt-4 space-y-4">
+            {(liveDashboard?.insights.length ? liveDashboard.insights : [
+              { type: "fixture", title: "Budget is ready", message: "Add more live transactions to unlock stronger dashboard insights." }
+            ]).map((insight) => (
+              <article key={`${insight.type}-${insight.title}`} className="rounded-md border border-slate-200 p-3 dark:border-slate-800">
+                <h3 className="font-semibold text-slate-950 dark:text-slate-100">{insight.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">{insight.message}</p>
+              </article>
+            ))}
+          </div>
+        </Panel>
+      </section>
     </div>
   );
+}
+
+function toViewModel(liveDashboard: LiveDashboardSummary): DashboardViewModel {
+  const categoryGroups = liveDashboard.categories.map((category, index) => ({
+    id: category.categoryId,
+    name: category.name,
+    allocatedInCents: category.allocatedInCents,
+    spentInCents: category.spentInCents,
+    accent: (["emerald", "cyan", "amber", "rose"][index % 4] ?? "emerald") as CategoryGroup["accent"],
+    categories: [category.latestTransaction ?? category.status]
+  }));
+
+  return {
+    generatedUtc: liveDashboard.generatedUtc,
+    budgetPeriod: liveDashboard.budgetPeriod,
+    financialStatus: {
+      status: liveDashboard.financialStatus.status as DashboardViewModel["financialStatus"]["status"],
+      message: liveDashboard.financialStatus.message,
+      moneyPulse: liveDashboard.financialStatus.moneyPulse
+    },
+    safeToSpend: liveDashboard.safeToSpend,
+    spending: liveDashboard.spending,
+    recommendedAction: liveDashboard.recommendedAction,
+    categoryGroups,
+    savingsTargets: dashboardFixture.savingsTargets,
+    gamePlan: {
+      level: Math.max(1, Math.floor(liveDashboard.financialStatus.moneyPulse / 20)),
+      title: liveDashboard.financialStatus.status === "comfortable" ? "Comfortable" : "Saver",
+      streakDays: dashboardFixture.gamePlan.streakDays,
+      points: Math.min(1000, liveDashboard.financialStatus.moneyPulse * 10),
+      nextLevelPoints: 1000,
+      badges: liveDashboard.insights.map((insight) => insight.title).slice(0, 3)
+    }
+  };
 }
 
 type StatusPanelProps = {

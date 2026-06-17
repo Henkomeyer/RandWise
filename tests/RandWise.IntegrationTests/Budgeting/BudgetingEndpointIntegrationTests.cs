@@ -94,6 +94,17 @@ public sealed class BudgetingEndpointIntegrationTests
         Assert.Equal(250000, safe.RemainingCategoryBudgetInCents);
         Assert.Equal(250000, safe.AmountInCents);
 
+        using var dashboardResponse = await client.GetAsync("/api/v1/dashboard");
+        dashboardResponse.EnsureSuccessStatusCode();
+        var dashboard = await ReadAsync<DashboardResponse>(dashboardResponse);
+        Assert.Equal(period.Id, dashboard.BudgetPeriod.Id);
+        Assert.Equal(250000, dashboard.SafeToSpend.AmountInCents);
+        Assert.Equal(150000, dashboard.Spending.SpentThisPeriodInCents);
+        Assert.Single(dashboard.Categories);
+        Assert.Single(dashboard.UpcomingCommitments);
+        Assert.NotEmpty(dashboard.CashFlowForecast);
+        Assert.NotEmpty(dashboard.Insights);
+
         using var budgetListResponse = await client.GetAsync($"/api/v1/budget-periods/{period.Id}/category-budgets");
         budgetListResponse.EnsureSuccessStatusCode();
         var budgets = await ReadAsync<CategoryBudgetResponse[]>(budgetListResponse);

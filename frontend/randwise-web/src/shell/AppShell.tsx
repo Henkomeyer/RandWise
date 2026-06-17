@@ -31,7 +31,7 @@ function AppShellLayout() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <SkipLink targetId="main-content">Skip to main content</SkipLink>
-      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col md:flex-row">
+      <div className="flex min-h-screen w-full flex-col md:flex-row">
         <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white px-5 py-6 dark:border-slate-800 dark:bg-slate-950 md:block">
           <NavLink
             to="/dashboard"
@@ -102,7 +102,7 @@ function AppShellLayout() {
             </div>
           </header>
 
-          <main id="main-content" className="flex-1 px-4 py-5 md:px-8 md:py-8">
+          <main id="main-content" className="flex-1 px-4 py-5 md:px-8 md:py-8 2xl:px-10">
             <Outlet />
           </main>
         </div>

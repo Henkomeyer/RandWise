@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using RandWise.Application.Budgeting;
 using RandWise.Application.Common;
+using RandWise.Application.Dashboard;
 using AppException = RandWise.Application.Common.ApplicationException;
 
 namespace RandWise.Api.Endpoints;
@@ -12,6 +13,17 @@ public static class DashboardEndpoints
         var dashboard = api.MapGroup("/dashboard")
             .RequireAuthorization()
             .WithTags("Dashboard");
+
+        dashboard.MapGet("/", async (
+                ClaimsPrincipal user,
+                IDashboardService service,
+                IClock clock,
+                CancellationToken cancellationToken) =>
+            await RunAsync(() => service.GetAsync(
+                user.GetRequiredUserId(),
+                DateOnly.FromDateTime(clock.UtcNow),
+                cancellationToken)))
+            .WithName("GetDashboard");
 
         dashboard.MapGet("/safe-to-spend", async (
                 ClaimsPrincipal user,
