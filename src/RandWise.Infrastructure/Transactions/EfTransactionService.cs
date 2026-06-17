@@ -29,6 +29,24 @@ public sealed class EfTransactionService : ITransactionService
         CreateTransactionRequest request,
         CancellationToken cancellationToken)
     {
+        return await CreateCoreAsync(userId, request, incomingMessageId: null, cancellationToken);
+    }
+
+    public async Task<TransactionResponse> CreateFromWhatsAppAsync(
+        string userId,
+        string incomingMessageId,
+        CreateTransactionRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await CreateCoreAsync(userId, request, incomingMessageId, cancellationToken);
+    }
+
+    private async Task<TransactionResponse> CreateCoreAsync(
+        string userId,
+        CreateTransactionRequest request,
+        string? incomingMessageId,
+        CancellationToken cancellationToken)
+    {
         var transactionType = DomainEnumNames.ParseTransactionType(request.TransactionType);
         var source = DomainEnumNames.ParseTransactionSource(request.Source);
         var categoryId = await ResolveCategoryIdAsync(userId, request.CategoryId, transactionType, cancellationToken);
@@ -47,6 +65,11 @@ public sealed class EfTransactionService : ITransactionService
             TransactionStatus.Confirmed,
             null,
             now);
+
+        if (!string.IsNullOrWhiteSpace(incomingMessageId))
+        {
+            transaction.LinkIncomingMessage(incomingMessageId);
+        }
 
         dbContext.Transactions.Add(transaction);
         await dbContext.SaveChangesAsync(cancellationToken);

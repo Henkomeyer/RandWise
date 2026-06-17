@@ -10,6 +10,12 @@ public interface ITransactionService
         CreateTransactionRequest request,
         CancellationToken cancellationToken);
 
+    Task<TransactionResponse> CreateFromWhatsAppAsync(
+        string userId,
+        string incomingMessageId,
+        CreateTransactionRequest request,
+        CancellationToken cancellationToken);
+
     Task<PagedResponse<TransactionResponse>> ListAsync(
         string userId,
         TransactionQuery query,

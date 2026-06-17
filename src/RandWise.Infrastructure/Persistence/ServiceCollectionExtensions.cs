@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDashboardService, EfDashboardService>();
         services.AddScoped<IWhatsAppContactService, EfWhatsAppContactService>();
         services.AddScoped<IWhatsAppWebhookService, EfWhatsAppWebhookService>();
+        services.AddScoped<IWhatsAppMessageProcessor, EfWhatsAppMessageProcessor>();
         services.AddScoped<IDeterministicWhatsAppParser, DeterministicWhatsAppParser>();
         services.AddScoped<IWhatsAppOutboundClient, NoOpWhatsAppOutboundClient>();
         services.AddScoped<IWhatsAppWebhookVerifier, WhatsAppWebhookVerifier>();

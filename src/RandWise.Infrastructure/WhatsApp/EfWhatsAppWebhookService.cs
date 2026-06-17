@@ -13,17 +13,20 @@ public sealed class EfWhatsAppWebhookService : IWhatsAppWebhookService
     private readonly RandWiseDbContext dbContext;
     private readonly IClock clock;
     private readonly IIdGenerator idGenerator;
+    private readonly IWhatsAppMessageProcessor messageProcessor;
     private readonly ISensitiveDataProtector protector;
 
     public EfWhatsAppWebhookService(
         RandWiseDbContext dbContext,
         IClock clock,
         IIdGenerator idGenerator,
+        IWhatsAppMessageProcessor messageProcessor,
         ISensitiveDataProtector protector)
     {
         this.dbContext = dbContext;
         this.clock = clock;
         this.idGenerator = idGenerator;
+        this.messageProcessor = messageProcessor;
         this.protector = protector;
     }
 
@@ -75,6 +78,9 @@ public sealed class EfWhatsAppWebhookService : IWhatsAppWebhookService
 
             throw;
         }
+
+        await messageProcessor.ProcessAsync(incoming.Id, cancellationToken);
+        await dbContext.Entry(incoming).ReloadAsync(cancellationToken);
 
         return new WhatsAppWebhookIngestionResponse(
             request.MessageId,

@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RandWise.Contracts.Auth;
+using RandWise.Contracts.Common;
+using RandWise.Contracts.Transactions;
 using RandWise.Contracts.WhatsApp;
 using RandWise.Infrastructure.Persistence;
 
@@ -95,13 +97,63 @@ public sealed class WhatsAppEndpointIntegrationTests
         {
             var message = await context.IncomingMessages.SingleAsync();
             var appUser = await context.AppUsers.SingleAsync();
+            var interpretation = await context.MessageInterpretations.SingleAsync();
+            var transaction = await context.Transactions.SingleAsync();
 
             Assert.Equal(appUser.Id, message.UserId);
             Assert.Equal("wamid.123", message.WhatsAppMessageId);
             Assert.Equal("wa-contact-2", message.PlatformContactId);
+            Assert.Equal("Processed", message.ProcessingStatus.ToString());
             Assert.StartsWith("sha256:", message.PayloadHash, StringComparison.Ordinal);
             Assert.DoesNotContain("R250 petrol", message.RawTextEncrypted, StringComparison.Ordinal);
+            Assert.Equal(message.Id, interpretation.IncomingMessageId);
+            Assert.Equal("create-transaction", interpretation.Intent);
+            Assert.Equal(25000, interpretation.AmountCents);
+            Assert.Equal(message.Id, transaction.IncomingMessageId);
+            Assert.Equal(25000, transaction.AmountCents);
+            Assert.Equal("Petrol", transaction.Description);
+            Assert.Equal("WhatsApp", transaction.Source.ToString());
         });
+
+    }
+
+    [Fact]
+    public async Task WebhookCreatedTransaction_IsVisibleThroughTransactionApiAsWhatsAppSource()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var tokens = await RegisterAsync(client, "wa-transaction-api@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        using var linkResponse = await client.PostAsJsonAsync(
+            "/api/v1/whatsapp/link",
+            new LinkWhatsAppRequest("+27 82 555 0303", "wa-contact-3"));
+        linkResponse.EnsureSuccessStatusCode();
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var body = """
+            {
+              "messageId": "wamid.456",
+              "platformContactId": "wa-contact-3",
+              "fromPhoneNumber": "+27825550303",
+              "messageType": "text",
+              "text": "spent R250 on petrol",
+              "receivedUtc": "2026-06-17T10:00:00Z"
+            }
+            """;
+
+        using var webhookResponse = await PostWebhookAsync(client, body);
+        webhookResponse.EnsureSuccessStatusCode();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        using var listResponse = await client.GetAsync("/api/v1/transactions?source=whatsapp");
+        listResponse.EnsureSuccessStatusCode();
+        var page = await ReadAsync<PagedResponse<TransactionResponse>>(listResponse);
+
+        var transaction = Assert.Single(page.Items);
+        Assert.Equal(25000, transaction.AmountInCents);
+        Assert.Equal("Petrol", transaction.Description);
+        Assert.Equal("whatsapp", transaction.Source);
     }
 
     [Fact]

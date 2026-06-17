@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 5 WhatsApp capture is in progress. The first backend batch for contact linking, webhook ingestion, parser foundation and outbound abstraction is complete.
+Wave 5 WhatsApp capture is in progress. Contact linking, webhook ingestion, parser foundation, outbound abstraction and transaction processing through the transaction service are complete.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -213,6 +213,14 @@ Actual repository state:
 - Sensitive phone numbers and raw message text are protected before storage; searchable phone matching uses a SHA-256 hash.
 - WhatsApp webhook ingestion persists `IncomingMessage` records only. RW-505 remains responsible for creating transactions through `ITransactionService`.
 - `dotnet test RandWise.sln` passed with 45 tests.
+
+### RW-505 WhatsApp transaction processing checkpoint
+
+- RW-505 process incoming message through existing transaction command complete.
+- Signed webhook ingestion now stores the incoming message, decrypts protected text inside the backend service boundary, parses deterministic transaction messages, stores a `MessageInterpretation`, and creates the transaction through `ITransactionService`.
+- WhatsApp-created transactions are linked back to `IncomingMessageId` and are visible through `GET /api/v1/transactions?source=whatsapp`.
+- Unsupported, unlinked or non-text messages are marked failed instead of creating transactions.
+- `dotnet test RandWise.sln` passed with 46 tests.
 
 ## Open decisions
 

@@ -30,4 +30,20 @@ public sealed class AesSensitiveDataProtector : ISensitiveDataProtector
 
         return Convert.ToBase64String(nonce.Concat(tag).Concat(ciphertext).ToArray());
     }
+
+    public string Unprotect(string protectedText)
+    {
+        var payload = Convert.FromBase64String(protectedText);
+        var nonceSize = AesGcm.NonceByteSizes.MaxSize;
+        var tagSize = AesGcm.TagByteSizes.MaxSize;
+        var nonce = payload[..nonceSize];
+        var tag = payload[nonceSize..(nonceSize + tagSize)];
+        var ciphertext = payload[(nonceSize + tagSize)..];
+        var plaintext = new byte[ciphertext.Length];
+
+        using var aes = new AesGcm(key, tag.Length);
+        aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+        return Encoding.UTF8.GetString(plaintext);
+    }
 }
