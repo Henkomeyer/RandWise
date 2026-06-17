@@ -42,6 +42,7 @@ public sealed class IncomingMessage : Entity
     public string PayloadHash { get; private set; }
     public MessageProcessingStatus ProcessingStatus { get; private set; }
     public string? FailureReason { get; private set; }
+    public int AttemptCount { get; private set; }
     public DateTime ReceivedUtc { get; private set; }
     public DateTime? ProcessedUtc { get; private set; }
 
@@ -66,6 +67,18 @@ public sealed class IncomingMessage : Entity
         ProcessingStatus = MessageProcessingStatus.Processed;
         ProcessedUtc = DomainGuard.Utc(processedUtc, nameof(processedUtc));
         FailureReason = null;
+    }
+
+    public void RecordProcessingAttempt(DateTime attemptedUtc)
+    {
+        AttemptCount++;
+        ProcessedUtc = DomainGuard.Utc(attemptedUtc, nameof(attemptedUtc));
+    }
+
+    public void MarkRetryableFailure(string failureReason)
+    {
+        ProcessingStatus = MessageProcessingStatus.Received;
+        FailureReason = DomainGuard.Required(failureReason, nameof(failureReason), 500);
     }
 
     public void MarkFailed(string failureReason, DateTime processedUtc)

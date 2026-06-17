@@ -7,7 +7,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using RandWise.Application.Common;
 using RandWise.Application.Jobs;
+using RandWise.Application.WhatsApp;
 using RandWise.Contracts.Auth;
 using RandWise.Contracts.Categories;
 using RandWise.Contracts.CategoryRules;
@@ -16,6 +19,7 @@ using RandWise.Contracts.FinancialProfile;
 using RandWise.Contracts.RecurringTransactions;
 using RandWise.Contracts.Transactions;
 using RandWise.Contracts.WhatsApp;
+using RandWise.Domain.Entities;
 using RandWise.Infrastructure.Persistence;
 
 namespace RandWise.IntegrationTests.WhatsApp;
@@ -254,6 +258,127 @@ public sealed class WhatsAppEndpointIntegrationTests
     }
 
     [Fact]
+    public async Task CategoryCorrection_CreatesPersonalRuleAndConfirmsTransaction()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var tokens = await RegisterAsync(client, "wa-correction-rule@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var fuelCategory = await CreateCategoryAsync(client, "Fuel");
+
+        using var linkResponse = await client.PostAsJsonAsync(
+            "/api/v1/whatsapp/link",
+            new LinkWhatsAppRequest("+27 82 555 0707", "wa-contact-7"));
+        linkResponse.EnsureSuccessStatusCode();
+        client.DefaultRequestHeaders.Authorization = null;
+
+        using var firstWebhookResponse = await PostWebhookAsync(client, """
+            {
+              "messageId": "wamid.correction-source",
+              "platformContactId": "wa-contact-7",
+              "fromPhoneNumber": "+27825550707",
+              "messageType": "text",
+              "text": "R450 petrol",
+              "receivedUtc": "2026-06-17T10:00:00Z"
+            }
+            """);
+        firstWebhookResponse.EnsureSuccessStatusCode();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        using var listBeforeResponse = await client.GetAsync("/api/v1/transactions?source=whatsapp");
+        listBeforeResponse.EnsureSuccessStatusCode();
+        var beforePage = await ReadAsync<PagedResponse<TransactionResponse>>(listBeforeResponse);
+        var transaction = Assert.Single(beforePage.Items);
+        Assert.Equal("needsReview", transaction.Status);
+
+        using var categoriseResponse = await client.PostAsJsonAsync(
+            $"/api/v1/transactions/{transaction.Id}/categorise",
+            new CategoriseTransactionRequest(fuelCategory.Id, true, "keyword", "petrol"));
+        categoriseResponse.EnsureSuccessStatusCode();
+        var corrected = await ReadAsync<TransactionResponse>(categoriseResponse);
+        Assert.Equal(fuelCategory.Id, corrected.CategoryId);
+        Assert.Equal("confirmed", corrected.Status);
+
+        using var rulesResponse = await client.GetAsync("/api/v1/category-rules");
+        rulesResponse.EnsureSuccessStatusCode();
+        var rules = await ReadAsync<List<CategoryRuleResponse>>(rulesResponse);
+        var learnedRule = Assert.Single(rules);
+        Assert.Equal("keyword", learnedRule.MatchType);
+        Assert.Equal("petrol", learnedRule.MatchValue);
+        Assert.Equal(fuelCategory.Id, learnedRule.CategoryId);
+
+        client.DefaultRequestHeaders.Authorization = null;
+        using var secondWebhookResponse = await PostWebhookAsync(client, """
+            {
+              "messageId": "wamid.correction-learned",
+              "platformContactId": "wa-contact-7",
+              "fromPhoneNumber": "+27825550707",
+              "messageType": "text",
+              "text": "R100 petrol",
+              "receivedUtc": "2026-06-18T10:00:00Z"
+            }
+            """);
+        secondWebhookResponse.EnsureSuccessStatusCode();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        using var listAfterResponse = await client.GetAsync("/api/v1/transactions?source=whatsapp&search=Petrol");
+        listAfterResponse.EnsureSuccessStatusCode();
+        var afterPage = await ReadAsync<PagedResponse<TransactionResponse>>(listAfterResponse);
+        Assert.All(afterPage.Items, item => Assert.Equal(fuelCategory.Id, item.CategoryId));
+        Assert.Contains(afterPage.Items, item => item.AmountInCents == 10000 && item.Status == "confirmed");
+    }
+
+    [Fact]
+    public async Task BackgroundJobProcessor_RetriesAndDeadLettersFailingWhatsAppMessages()
+    {
+        await using var factory = await TestApplication.CreateAsync(services =>
+        {
+            services.RemoveAll<IWhatsAppMessageProcessor>();
+            services.AddScoped<IWhatsAppMessageProcessor, ThrowingWhatsAppMessageProcessor>();
+        });
+
+        await factory.UseContextAsync(async context =>
+        {
+            context.IncomingMessages.Add(IncomingMessage.Create(
+                "incoming-retry",
+                "user-retry",
+                "wamid.retry",
+                "wa-contact-retry",
+                "text",
+                "protected",
+                "sha256:payload",
+                new DateTime(2026, 6, 17, 10, 0, 0, DateTimeKind.Utc)));
+            context.AppUsers.Add(AppUser.Create(
+                "user-retry",
+                "identity-user-retry",
+                "Retry User",
+                new DateTime(2026, 6, 17, 10, 0, 0, DateTimeKind.Utc)));
+            await context.SaveChangesAsync();
+        });
+
+        Assert.Equal(1, await factory.ProcessQueuedWhatsAppAsync());
+
+        await factory.UseContextAsync(async context =>
+        {
+            var message = await context.IncomingMessages.SingleAsync();
+            Assert.Equal("Received", message.ProcessingStatus.ToString());
+            Assert.Equal(1, message.AttemptCount);
+            Assert.Contains("InvalidOperationException", message.FailureReason, StringComparison.Ordinal);
+        });
+
+        Assert.Equal(1, await factory.ProcessQueuedWhatsAppAsync());
+        Assert.Equal(1, await factory.ProcessQueuedWhatsAppAsync());
+
+        await factory.UseContextAsync(async context =>
+        {
+            var message = await context.IncomingMessages.SingleAsync();
+            Assert.Equal("Failed", message.ProcessingStatus.ToString());
+            Assert.Equal(3, message.AttemptCount);
+            Assert.Contains("InvalidOperationException", message.FailureReason, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
     public async Task BackgroundJobProcessor_GeneratesDueRecurringTransactions()
     {
         await using var factory = await TestApplication.CreateAsync();
@@ -422,7 +547,7 @@ public sealed class WhatsAppEndpointIntegrationTests
             this.factory = factory;
         }
 
-        public static async Task<TestApplication> CreateAsync()
+        public static async Task<TestApplication> CreateAsync(Action<IServiceCollection>? configureServices = null)
         {
             var databasePath = Path.Combine(Path.GetTempPath(), $"randwise-whatsapp-{Guid.NewGuid():N}.db");
             var connectionString = $"Data Source={databasePath}";
@@ -438,6 +563,10 @@ public sealed class WhatsAppEndpointIntegrationTests
                     builder.UseSetting("WhatsApp:VerifyToken", "verify-token");
                     builder.UseSetting("WhatsApp:AppSecret", WebhookSecret);
                     builder.UseSetting("SensitiveData:Key", "integration-sensitive-data-key-at-least-32-chars");
+                    if (configureServices is not null)
+                    {
+                        builder.ConfigureServices(configureServices);
+                    }
                 });
 
             var application = new TestApplication(databasePath, factory);
@@ -463,6 +592,13 @@ public sealed class WhatsAppEndpointIntegrationTests
             return await processor.GenerateDueRecurringTransactionsAsync(today, CancellationToken.None);
         }
 
+        public async Task<int> ProcessQueuedWhatsAppAsync()
+        {
+            using var scope = factory.Services.CreateScope();
+            var processor = scope.ServiceProvider.GetRequiredService<IBackgroundJobProcessor>();
+            return await processor.ProcessQueuedWhatsAppMessagesAsync(CancellationToken.None);
+        }
+
         public async ValueTask DisposeAsync()
         {
             await factory.DisposeAsync();
@@ -486,6 +622,29 @@ public sealed class WhatsAppEndpointIntegrationTests
             catch (UnauthorizedAccessException)
             {
             }
+        }
+    }
+
+    private sealed class ThrowingWhatsAppMessageProcessor : IWhatsAppMessageProcessor
+    {
+        private readonly RandWiseDbContext dbContext;
+        private readonly IClock clock;
+
+        public ThrowingWhatsAppMessageProcessor(RandWiseDbContext dbContext, IClock clock)
+        {
+            this.dbContext = dbContext;
+            this.clock = clock;
+        }
+
+        public async Task ProcessAsync(string incomingMessageId, CancellationToken cancellationToken)
+        {
+            var incoming = await dbContext.IncomingMessages.SingleAsync(
+                message => message.Id == incomingMessageId,
+                cancellationToken);
+            incoming.RecordProcessingAttempt(clock.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            throw new InvalidOperationException("Simulated transient processor failure.");
         }
     }
 }

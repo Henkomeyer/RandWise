@@ -130,6 +130,7 @@ Indexes:
 - PayloadHash TEXT NOT NULL
 - ProcessingStatus INTEGER NOT NULL
 - FailureReason TEXT NULL
+- AttemptCount INTEGER NOT NULL DEFAULT 0
 - ReceivedUtc TEXT NOT NULL
 - ProcessedUtc TEXT NULL
 

@@ -156,6 +156,19 @@ Filters:
 }
 ```
 
+## Categorise transaction request
+
+`POST /transactions/{id}/categorise` updates the category and confirms a reviewed transaction. When `createRule` is true, the backend learns a personal rule from the correction.
+
+```json
+{
+  "categoryId": "category-id",
+  "createRule": true,
+  "matchType": "keyword",
+  "matchValue": "petrol"
+}
+```
+
 ## Category rule request
 
 ```json
@@ -238,3 +251,5 @@ Filters:
 - WhatsApp webhooks must verify signatures when a provider secret is configured and must be idempotent on provider message ID.
 - WhatsApp capture must process parsed transactions through the transaction application service, not direct transaction table writes.
 - Personal category rules and deterministic system rules must run before AI classification.
+- Category corrections that create rules must be handled by the transaction application service.
+- Incoming WhatsApp processing must retry transient processor failures and mark exhausted messages failed instead of looping forever.

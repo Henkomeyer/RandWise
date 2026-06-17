@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RandWise.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using RandWise.Infrastructure.Persistence;
 namespace RandWise.Infrastructure.Migrations
 {
     [DbContext(typeof(RandWiseDbContext))]
-    partial class RandWiseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260617160947_AddIncomingMessageAttempts")]
+    partial class AddIncomingMessageAttempts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");

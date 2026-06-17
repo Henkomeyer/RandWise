@@ -20,6 +20,7 @@ public sealed class IncomingMessageConfiguration : IEntityTypeConfiguration<Inco
         builder.Property(message => message.PayloadHash).HasMaxLength(256).IsRequired();
         builder.Property(message => message.ProcessingStatus).HasConversion<int>().IsRequired();
         builder.Property(message => message.FailureReason).HasMaxLength(500);
+        builder.Property(message => message.AttemptCount).IsRequired().HasDefaultValue(0);
         builder.Property(message => message.ReceivedUtc).HasColumnType("TEXT").IsRequired();
         builder.Property(message => message.ProcessedUtc).HasColumnType("TEXT");
 

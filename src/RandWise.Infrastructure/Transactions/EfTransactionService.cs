@@ -203,8 +203,79 @@ public sealed class EfTransactionService : ITransactionService
             transaction.Notes,
             clock.UtcNow);
 
+        transaction.MarkConfirmed(clock.UtcNow);
+
+        if (request.CreateRule)
+        {
+            await LearnCategoryRuleAsync(userId, transaction, request, category.Id, cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToResponse(transaction);
+    }
+
+    private async Task LearnCategoryRuleAsync(
+        string userId,
+        Transaction transaction,
+        CategoriseTransactionRequest request,
+        string categoryId,
+        CancellationToken cancellationToken)
+    {
+        var matchType = ParseMatchType(request.MatchType);
+        var matchValue = ResolveRuleMatchValue(transaction, request.MatchValue, matchType);
+        var normalizedMatchValue = matchValue.Trim().ToLowerInvariant();
+
+        var activeDuplicate = await dbContext.UserCategoryRules
+            .Where(rule => rule.UserId == userId
+                && rule.IsActive
+                && rule.MatchType == matchType
+                && rule.NormalizedMatchValue == normalizedMatchValue)
+            .OrderByDescending(rule => rule.Priority)
+            .ThenByDescending(rule => rule.UpdatedUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (activeDuplicate?.CategoryId == categoryId)
+        {
+            return;
+        }
+
+        activeDuplicate?.Deactivate(clock.UtcNow);
+
+        dbContext.UserCategoryRules.Add(UserCategoryRule.Create(
+            idGenerator.NewId(),
+            userId,
+            matchType,
+            matchValue,
+            categoryId,
+            200,
+            clock.UtcNow));
+    }
+
+    private static CategoryRuleMatchType ParseMatchType(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            null or "" => CategoryRuleMatchType.Keyword,
+            "keyword" => CategoryRuleMatchType.Keyword,
+            "merchant" => CategoryRuleMatchType.Merchant,
+            _ => throw new AppException(ApplicationError.Validation, "Rule match type is invalid.")
+        };
+
+    private static string ResolveRuleMatchValue(
+        Transaction transaction,
+        string? requestedMatchValue,
+        CategoryRuleMatchType matchType)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedMatchValue))
+        {
+            return requestedMatchValue;
+        }
+
+        if (matchType == CategoryRuleMatchType.Merchant && !string.IsNullOrWhiteSpace(transaction.Merchant))
+        {
+            return transaction.Merchant;
+        }
+
+        return transaction.Description;
     }
 
     private static IQueryable<Transaction> ApplyFilters(IQueryable<Transaction> transactions, TransactionQuery query)

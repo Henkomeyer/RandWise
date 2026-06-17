@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 6 intelligence and jobs is in progress. The first intelligence/jobs batch for category rules, system rules, confidence handling, classifier interface, job processor abstraction and recurring generation is complete.
+Wave 6 intelligence and jobs is complete. The repository is ready to start Wave 7 reports and privacy.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -20,7 +20,7 @@ Actual repository state:
 | 3 Budgeting | Complete | Passed |
 | 4 Dashboard | Complete | Passed |
 | 5 WhatsApp capture | Complete | Passed |
-| 6 Intelligence/jobs | In progress | Pending |
+| 6 Intelligence/jobs | Complete | Passed |
 | 7 Reports/privacy | Not started | Pending |
 | 8 Beta hardening | Not started | Pending |
 
@@ -247,6 +247,23 @@ Actual repository state:
 - RW-605 database-backed background processor abstraction complete for queued WhatsApp processing and due recurring generation.
 - RW-606 recurring transaction generation complete for due auto-create items through the transaction application service.
 - `dotnet test RandWise.sln` passed with 50 tests.
+
+### RW-609 Wave 6 intelligence acceptance
+
+- RW-607 category correction learning complete through `POST /api/v1/transactions/{id}/categorise`.
+- Category corrections can optionally create personal keyword or merchant rules and confirm reviewed transactions.
+- RW-608 retry and dead-letter behavior complete for queued WhatsApp message processing.
+- `IncomingMessages.AttemptCount` migration added with default 0.
+- Low-confidence WhatsApp interpretation requests clarification instead of creating a transaction.
+- `dotnet format RandWise.sln --verify-no-changes` passed.
+- `dotnet build RandWise.sln` passed.
+- `dotnet test RandWise.sln` passed with 52 tests.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed with 9 tests.
+- `npm run build` passed.
+- `VITE_DEMO_MODE=true npm run build` passed.
+- `npm run test:e2e` is not available yet.
 
 ## Open decisions
 

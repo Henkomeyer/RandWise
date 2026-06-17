@@ -14,6 +14,7 @@ namespace RandWise.Infrastructure.WhatsApp;
 
 public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
 {
+    private const int MinimumTransactionConfidenceBasisPoints = 7000;
     private readonly RandWiseDbContext dbContext;
     private readonly IClock clock;
     private readonly ICategoryClassificationService categoryClassificationService;
@@ -52,6 +53,9 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
         {
             return;
         }
+
+        incoming.RecordProcessingAttempt(clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         if (incoming.UserId is null)
         {
@@ -107,6 +111,14 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
             return;
         }
 
+        if (interpretation.ConfidenceBasisPoints < MinimumTransactionConfidenceBasisPoints)
+        {
+            await QueueClarificationAsync(incoming, parsed, cancellationToken);
+            incoming.MarkFailed("Message confidence was below the transaction threshold.", clock.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
         await transactionService.CreateFromWhatsAppAsync(
             incoming.UserId,
             incoming.Id,
@@ -156,6 +168,29 @@ public sealed class EfWhatsAppMessageProcessor : IWhatsAppMessageProcessor
             incoming.UserId!,
             NotificationChannel.WhatsApp,
             NotificationType.TransactionConfirmation,
+            protector.Protect(message),
+            clock.UtcNow,
+            clock.UtcNow);
+
+        dbContext.Notifications.Add(notification);
+        await outboundClient.SendTextAsync(incoming.PlatformContactId, message, cancellationToken);
+        notification.MarkSent(clock.UtcNow);
+    }
+
+    private async Task QueueClarificationAsync(
+        IncomingMessage incoming,
+        ParsedWhatsAppMessage parsed,
+        CancellationToken cancellationToken)
+    {
+        var message = parsed.AmountInCents is null
+            ? "I could not read that spend. Please send it like: R250 petrol."
+            : $"I am not sure where to put {FormatRand(parsed.AmountInCents.Value)}. Please reply with a clearer category.";
+
+        var notification = Notification.Create(
+            idGenerator.NewId(),
+            incoming.UserId!,
+            NotificationChannel.WhatsApp,
+            NotificationType.ClarificationRequest,
             protector.Protect(message),
             clock.UtcNow,
             clock.UtcNow);

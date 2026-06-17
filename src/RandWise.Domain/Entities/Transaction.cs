@@ -113,4 +113,10 @@ public sealed class Transaction : UserOwnedAggregateRoot
         UpdatedUtc = DomainGuard.Utc(restoredUtc, nameof(restoredUtc));
         Status = ConfidenceBasisPoints is >= 7000 and < 9000 ? TransactionStatus.NeedsReview : TransactionStatus.Confirmed;
     }
+
+    public void MarkConfirmed(DateTime confirmedUtc)
+    {
+        Status = TransactionStatus.Confirmed;
+        UpdatedUtc = DomainGuard.Utc(confirmedUtc, nameof(confirmedUtc));
+    }
 }
