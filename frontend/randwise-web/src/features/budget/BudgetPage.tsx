@@ -48,34 +48,25 @@ export function BudgetPage() {
   const targetPoints = targets.reduce((sum, target) => sum + Math.min(100, getPercent(target.savedInCents, target.targetInCents)), 0);
   const level = Math.max(1, Math.floor(targetPoints / 120) + 1);
 
-  const groupedBudgets = useMemo(
-    () => [
-      {
-        title: "Essentials",
-        tone: "emerald",
-        budgets: categoryBudgets.filter((budget) => /groceries|transport|rent|utilities|home/i.test(budget.categoryName))
-      },
-      {
-        title: "Lifestyle",
-        tone: "cyan",
-        budgets: categoryBudgets.filter((budget) => /food|coffee|entertainment|shopping|takeaway/i.test(budget.categoryName))
-      },
-      {
-        title: "Saving",
-        tone: "amber",
-        budgets: categoryBudgets.filter((budget) => /saving|investment|emergency/i.test(budget.categoryName))
-      }
-    ].map((group, index, groups) => ({
-      ...group,
-      budgets:
-        index === groups.length - 1
-          ? group.budgets.concat(
-              categoryBudgets.filter((budget) => !groups.some((other) => other !== group && other.budgets.includes(budget)))
-            )
-          : group.budgets
-    })),
-    [categoryBudgets]
-  );
+  const groupedBudgets = useMemo(() => {
+    const essentials = categoryBudgets.filter((budget) =>
+      /groceries|transport|rent|utilities|home/i.test(budget.categoryName)
+    );
+    const essentialIds = new Set(essentials.map((budget) => budget.id));
+    const lifestyle = categoryBudgets.filter(
+      (budget) =>
+        !essentialIds.has(budget.id)
+        && /food|coffee|entertainment|shopping|takeaway/i.test(budget.categoryName)
+    );
+    const assignedIds = new Set([...essentials, ...lifestyle].map((budget) => budget.id));
+    const saving = categoryBudgets.filter((budget) => !assignedIds.has(budget.id));
+
+    return [
+      { title: "Essentials", tone: "emerald", budgets: essentials },
+      { title: "Lifestyle", tone: "cyan", budgets: lifestyle },
+      { title: "Saving", tone: "amber", budgets: saving }
+    ];
+  }, [categoryBudgets]);
 
   useEffect(() => {
     let isActive = true;
