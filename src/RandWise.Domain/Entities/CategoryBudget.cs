@@ -47,8 +47,14 @@ public sealed class CategoryBudget : Entity
         DateTime createdUtc) =>
         new(id, budgetPeriodId, categoryId, allocatedAmountCents, rolloverAmountCents, warningThresholdPercent, createdUtc);
 
-    public void Update(long allocatedAmountCents, long rolloverAmountCents, int warningThresholdPercent, DateTime updatedUtc)
+    public void Update(
+        string categoryId,
+        long allocatedAmountCents,
+        long rolloverAmountCents,
+        int warningThresholdPercent,
+        DateTime updatedUtc)
     {
+        CategoryId = DomainGuard.Required(categoryId, nameof(categoryId), 128);
         AllocatedAmountCents = DomainGuard.NonNegativeCents(allocatedAmountCents, nameof(allocatedAmountCents));
         RolloverAmountCents = rolloverAmountCents;
         WarningThresholdPercent = DomainGuard.Range(warningThresholdPercent, nameof(warningThresholdPercent), 1, 100);

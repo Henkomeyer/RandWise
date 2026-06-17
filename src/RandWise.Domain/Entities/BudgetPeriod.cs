@@ -65,6 +65,21 @@ public sealed class BudgetPeriod : UserOwnedAggregateRoot
         UpdatedUtc = DomainGuard.Utc(updatedUtc, nameof(updatedUtc));
     }
 
+    public void UpdateDetails(
+        DateOnly startDate,
+        DateOnly endDate,
+        long expectedIncomeCents,
+        long openingBalanceCents,
+        DateTime updatedUtc)
+    {
+        DomainGuard.DateRange(startDate, endDate);
+        StartDate = startDate;
+        EndDate = endDate;
+        ExpectedIncomeCents = DomainGuard.NonNegativeCents(expectedIncomeCents, nameof(expectedIncomeCents));
+        OpeningBalanceCents = openingBalanceCents;
+        UpdatedUtc = DomainGuard.Utc(updatedUtc, nameof(updatedUtc));
+    }
+
     public void Close(DateTime closedUtc)
     {
         Status = BudgetPeriodStatus.Closed;

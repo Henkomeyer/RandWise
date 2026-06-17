@@ -52,6 +52,31 @@ public static class DomainEnumNames
             _ => throw new ApplicationException(ApplicationError.Validation, "Transaction source is invalid.")
         };
 
+    public static BudgetPeriodStatus ParseBudgetPeriodStatus(string value) =>
+        Normalize(value) switch
+        {
+            "open" => BudgetPeriodStatus.Open,
+            "closed" => BudgetPeriodStatus.Closed,
+            _ => throw new ApplicationException(ApplicationError.Validation, "Budget period status is invalid.")
+        };
+
+    public static BudgetCategoryType ParseBudgetCategoryType(string value) =>
+        Normalize(value) switch
+        {
+            "expense" => BudgetCategoryType.Expense,
+            "income" => BudgetCategoryType.Income,
+            "savings" => BudgetCategoryType.Savings,
+            _ => throw new ApplicationException(ApplicationError.Validation, "Budget category type is invalid.")
+        };
+
+    public static RecurrenceFrequency ParseRecurrenceFrequency(string value) =>
+        Normalize(value) switch
+        {
+            "weekly" => RecurrenceFrequency.Weekly,
+            "monthly" => RecurrenceFrequency.Monthly,
+            _ => throw new ApplicationException(ApplicationError.Validation, "Recurrence frequency is invalid.")
+        };
+
     public static string ToContract(this BudgetCycleType value) =>
         value switch
         {
@@ -94,6 +119,31 @@ public static class DomainEnumNames
             TransactionStatus.NeedsReview => "needsReview",
             TransactionStatus.Deleted => "deleted",
             _ => throw new ApplicationException(ApplicationError.Validation, "Transaction status is invalid.")
+        };
+
+    public static string ToContract(this BudgetPeriodStatus value) =>
+        value switch
+        {
+            BudgetPeriodStatus.Open => "open",
+            BudgetPeriodStatus.Closed => "closed",
+            _ => throw new ApplicationException(ApplicationError.Validation, "Budget period status is invalid.")
+        };
+
+    public static string ToContract(this BudgetCategoryType value) =>
+        value switch
+        {
+            BudgetCategoryType.Expense => "expense",
+            BudgetCategoryType.Income => "income",
+            BudgetCategoryType.Savings => "savings",
+            _ => throw new ApplicationException(ApplicationError.Validation, "Budget category type is invalid.")
+        };
+
+    public static string ToContract(this RecurrenceFrequency value) =>
+        value switch
+        {
+            RecurrenceFrequency.Weekly => "weekly",
+            RecurrenceFrequency.Monthly => "monthly",
+            _ => throw new ApplicationException(ApplicationError.Validation, "Recurrence frequency is invalid.")
         };
 
     public static string ToContract(this DayOfWeek value) =>

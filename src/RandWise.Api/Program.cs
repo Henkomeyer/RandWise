@@ -66,6 +66,11 @@ api.MapGet("/health", () => Results.Ok(new HealthResponse("Healthy", DateTimeOff
 api.MapAuthEndpoints();
 api.MapFinancialProfileEndpoints();
 api.MapTransactionEndpoints();
+api.MapCategoryEndpoints();
+api.MapBudgetPeriodEndpoints();
+api.MapCategoryBudgetRootEndpoints();
+api.MapRecurringTransactionEndpoints();
+api.MapDashboardEndpoints();
 
 app.Run();
 

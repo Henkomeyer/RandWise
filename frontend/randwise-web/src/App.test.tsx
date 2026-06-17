@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Transaction } from "./api/client";
 import { AuthProvider } from "./auth/AuthContext";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { BudgetPage } from "./features/budget/BudgetPage";
 import { PlaceholderRoute } from "./features/placeholder/PlaceholderRoute";
 import { TransactionsPage } from "./features/transactions/TransactionsPage";
 import { AppShell } from "./shell/AppShell";
@@ -37,15 +38,7 @@ function renderShell(initialPath = "/dashboard") {
               />
             )
           },
-          {
-            path: "budget",
-            element: (
-              <PlaceholderRoute
-                title="Budget"
-                intent="Set payday, buffers, category budgets and recurring commitments."
-              />
-            )
-          },
+          { path: "budget", element: <BudgetPage /> },
           {
             path: "more",
             element: (
@@ -110,6 +103,19 @@ describe("RandWise app shell", () => {
       await screen.findByRole("heading", { name: "Transactions" })
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /quick add/i })).toBeInTheDocument();
+  });
+
+  it("renders the budget workspace with targets and category groups", async () => {
+    mockAuthenticatedSession();
+    mockBudgetWorkspace();
+
+    renderShell("/budget");
+
+    expect(await screen.findByRole("heading", { name: /budget command center/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /category groups/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /recurring commitments/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /saving targets/i })).toBeInTheDocument();
+    expect(screen.getByText(/weekly buffer/i)).toBeInTheDocument();
   });
 
   it("supports the transaction create edit delete and restore flow", async () => {
@@ -283,4 +289,82 @@ function jsonResponse(body: unknown, status = 200) {
       headers: { "Content-Type": "application/json" }
     })
   );
+}
+
+function mockBudgetWorkspace() {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = input.toString();
+
+    if (url.endsWith("/categories")) {
+      return jsonResponse([
+        {
+          id: "category-1",
+          name: "Groceries",
+          slug: "groceries",
+          categoryType: "expense",
+          icon: "basket",
+          sortOrder: 10,
+          isSystem: false,
+          isActive: true,
+          createdUtc: "2026-06-17T10:00:00Z",
+          updatedUtc: "2026-06-17T10:00:00Z"
+        }
+      ]);
+    }
+
+    if (url.endsWith("/budget-periods")) {
+      return jsonResponse([
+        {
+          id: "period-1",
+          startDate: "2026-06-01",
+          endDate: "2026-06-30",
+          expectedIncomeCents: 2500000,
+          actualIncomeCents: 0,
+          openingBalanceCents: 100000,
+          status: "open",
+          daysRemaining: 14,
+          createdUtc: "2026-06-17T10:00:00Z",
+          updatedUtc: "2026-06-17T10:00:00Z"
+        }
+      ]);
+    }
+
+    if (url.endsWith("/recurring-transactions")) {
+      return jsonResponse([]);
+    }
+
+    if (url.endsWith("/budget-periods/period-1/category-budgets")) {
+      return jsonResponse([
+        {
+          id: "budget-1",
+          budgetPeriodId: "period-1",
+          categoryId: "category-1",
+          categoryName: "Groceries",
+          allocatedAmountCents: 500000,
+          rolloverAmountCents: 0,
+          warningThresholdPercent: 80,
+          spentAmountCents: 125000,
+          createdUtc: "2026-06-17T10:00:00Z",
+          updatedUtc: "2026-06-17T10:00:00Z"
+        }
+      ]);
+    }
+
+    if (url.endsWith("/dashboard/safe-to-spend")) {
+      return jsonResponse({
+        budgetPeriodId: "period-1",
+        availableCashInCents: 2600000,
+        protectedAmountInCents: 350000,
+        safetyBufferInCents: 50000,
+        savingsCommitmentInCents: 250000,
+        upcomingCommitmentsInCents: 50000,
+        remainingCategoryBudgetInCents: 375000,
+        amountInCents: 375000,
+        dailyAmountInCents: 26785,
+        daysRemaining: 14
+      });
+    }
+
+    return jsonResponse({ title: "Unexpected request" }, 500);
+  });
 }

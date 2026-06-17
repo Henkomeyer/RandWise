@@ -2,14 +2,13 @@
 
 ## Current phase
 
-Wave 3 budgeting ready to start.
+Wave 3 budgeting complete. Wave 4 dashboard is ready to start.
 
-Actual repository state at bootstrap start:
-- Blueprint documents are present.
-- Planned backend solution/projects are not yet present.
-- Planned frontend application is not yet present.
-- Planned test projects are not yet present.
-- The extracted workspace is not currently a Git repository, so branch/worktree orchestration is unavailable in this folder.
+Actual repository state:
+- .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
+- React, TypeScript, Vite and Tailwind frontend is present under `frontend/randwise-web`.
+- Unit, architecture and integration test projects are present.
+- GitHub remote is configured for `Henkomeyer/RandWise`.
 
 ## Wave status
 
@@ -18,7 +17,7 @@ Actual repository state at bootstrap start:
 | 0 Repository bootstrap | Complete | Passed |
 | 1 Domain/platform foundation | Complete | Passed |
 | 2 First vertical slice | Complete | Passed |
-| 3 Budgeting | Not started | Pending |
+| 3 Budgeting | Complete | Passed |
 | 4 Dashboard | Not started | Pending |
 | 5 WhatsApp capture | Not started | Pending |
 | 6 Intelligence/jobs | Not started | Pending |
@@ -149,6 +148,24 @@ Actual repository state at bootstrap start:
 - `npm run build` passed.
 - `VITE_DEMO_MODE=true npm run build` passed.
 - Live browser smoke check passed against local API and Vite for register -> transactions -> add -> edit -> soft-delete -> restore.
+- `npm run test:e2e` is not available yet.
+
+### RW-307 Wave 3 budgeting acceptance
+
+- RW-301 budget periods and category budgets complete.
+- RW-302 recurring commitments complete.
+- RW-303 budget frontend complete.
+- RW-304 category management frontend complete.
+- RW-305 safe-to-spend service complete.
+- RW-306 budgeting integration tests complete for lifecycle, safe-to-spend calculation and cross-user isolation.
+- Intentional API contract addition: `GET /api/v1/dashboard/safe-to-spend`.
+- Frontend `/budget` now supports category creation, period creation, grouped category budgets, recurring commitment creation/pause, and local weekly/monthly saving targets.
+- `dotnet test RandWise.sln` passed with 36 tests.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed with 8 tests.
+- `npm run build` passed.
+- `VITE_DEMO_MODE=true npm run build` passed.
 - `npm run test:e2e` is not available yet.
 
 ## Open decisions

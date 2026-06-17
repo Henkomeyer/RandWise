@@ -81,6 +81,22 @@ public sealed class BudgetCategory : Entity
         UpdatedUtc = DomainGuard.Utc(updatedUtc, nameof(updatedUtc));
     }
 
+    public void UpdateDetails(
+        string name,
+        string slug,
+        BudgetCategoryType categoryType,
+        string? icon,
+        int sortOrder,
+        DateTime updatedUtc)
+    {
+        Name = DomainGuard.Required(name, nameof(name), 100);
+        Slug = DomainGuard.Required(slug, nameof(slug), 120).ToLowerInvariant();
+        CategoryType = categoryType;
+        Icon = DomainGuard.Optional(icon, nameof(icon), 64);
+        SortOrder = sortOrder;
+        UpdatedUtc = DomainGuard.Utc(updatedUtc, nameof(updatedUtc));
+    }
+
     public void Deactivate(DateTime updatedUtc)
     {
         IsActive = false;

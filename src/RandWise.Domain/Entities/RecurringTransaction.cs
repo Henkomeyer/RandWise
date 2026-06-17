@@ -87,6 +87,39 @@ public sealed class RecurringTransaction : UserOwnedAggregateRoot
         UpdatedUtc = DomainGuard.Utc(updatedUtc, nameof(updatedUtc));
     }
 
+    public void UpdateDetails(
+        string categoryId,
+        string description,
+        string? merchant,
+        long amountCents,
+        TransactionType transactionType,
+        RecurrenceFrequency frequency,
+        int? dayOfMonth,
+        DayOfWeek? dayOfWeek,
+        DateOnly nextOccurrenceDate,
+        DateOnly? endDate,
+        bool autoCreate,
+        DateTime updatedUtc)
+    {
+        CategoryId = DomainGuard.Required(categoryId, nameof(categoryId), 128);
+        Description = DomainGuard.Required(description, nameof(description), 280);
+        Merchant = DomainGuard.Optional(merchant, nameof(merchant), 160);
+        AmountCents = DomainGuard.PositiveCents(amountCents, nameof(amountCents));
+        TransactionType = transactionType;
+        Frequency = frequency;
+        DayOfMonth = dayOfMonth is null ? null : DomainGuard.Range(dayOfMonth.Value, nameof(dayOfMonth), 1, 31);
+        DayOfWeek = dayOfWeek;
+        NextOccurrenceDate = nextOccurrenceDate;
+        EndDate = endDate;
+        if (EndDate is not null && EndDate.Value < NextOccurrenceDate)
+        {
+            throw new DomainException("End date cannot be before next occurrence date.");
+        }
+
+        AutoCreate = autoCreate;
+        UpdatedUtc = DomainGuard.Utc(updatedUtc, nameof(updatedUtc));
+    }
+
     public void MoveNextOccurrence(DateOnly nextOccurrenceDate, DateTime updatedUtc)
     {
         if (EndDate is not null && EndDate.Value < nextOccurrenceDate)

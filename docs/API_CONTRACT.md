@@ -71,6 +71,7 @@ Filters:
 
 ## Dashboard
 - GET `/dashboard`
+- GET `/dashboard/safe-to-spend`
 - GET `/dashboard/cash-flow`
 - GET `/dashboard/spending-trend`
 - GET `/dashboard/category-progress`

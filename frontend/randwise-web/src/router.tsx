@@ -3,6 +3,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./shell/AppShell";
 import { LoginPage, RegisterPage } from "./features/auth/AuthPages";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { BudgetPage } from "./features/budget/BudgetPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { PlaceholderRoute } from "./features/placeholder/PlaceholderRoute";
 import { TransactionsPage } from "./features/transactions/TransactionsPage";
@@ -22,15 +23,7 @@ export const router = createBrowserRouter([
           { path: "onboarding", element: <OnboardingPage /> },
           { path: "transactions", element: <TransactionsPage /> },
           { path: "add", element: <TransactionsPage /> },
-          {
-            path: "budget",
-            element: (
-              <PlaceholderRoute
-                title="Budget"
-                intent="Set payday, buffers, category budgets and recurring commitments."
-              />
-            )
-          },
+          { path: "budget", element: <BudgetPage /> },
           {
             path: "more",
             element: (
