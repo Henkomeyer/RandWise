@@ -110,6 +110,55 @@ public sealed class FinancialProfileAndTransactionEndpointTests
         Assert.Empty(secondPage.Items);
     }
 
+    [Fact]
+    public async Task Transactions_RejectCrossUserLifecycleAccess()
+    {
+        await using var factory = await TestApplication.CreateAsync();
+        using var firstClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var secondClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var firstTokens = await RegisterAsync(firstClient, "owner@example.com");
+        var secondTokens = await RegisterAsync(secondClient, "intruder@example.com");
+        firstClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", firstTokens.AccessToken);
+        secondClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", secondTokens.AccessToken);
+
+        using var createResponse = await firstClient.PostAsJsonAsync(
+            "/api/v1/transactions",
+            new CreateTransactionRequest(12000, "expense", null, "Groceries", null, new DateOnly(2026, 06, 14), "web"));
+        createResponse.EnsureSuccessStatusCode();
+        var created = await ReadAsync<TransactionResponse>(createResponse);
+
+        using var getResponse = await secondClient.GetAsync($"/api/v1/transactions/{created.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+
+        using var updateResponse = await secondClient.PutAsJsonAsync(
+            $"/api/v1/transactions/{created.Id}",
+            new UpdateTransactionRequest(
+                13000,
+                "expense",
+                created.CategoryId,
+                "Tamper",
+                null,
+                new DateOnly(2026, 06, 15),
+                null));
+        Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
+
+        using var deleteResponse = await secondClient.DeleteAsync($"/api/v1/transactions/{created.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
+
+        using var ownerListResponse = await firstClient.GetAsync("/api/v1/transactions");
+        ownerListResponse.EnsureSuccessStatusCode();
+        var ownerPage = await ReadAsync<PagedResponse<TransactionResponse>>(ownerListResponse);
+        Assert.Single(ownerPage.Items);
+        Assert.Equal("Groceries", ownerPage.Items[0].Description);
+
+        using var ownerDeleteResponse = await firstClient.DeleteAsync($"/api/v1/transactions/{created.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, ownerDeleteResponse.StatusCode);
+
+        using var restoreResponse = await secondClient.PostAsync($"/api/v1/transactions/{created.Id}/restore", null);
+        Assert.Equal(HttpStatusCode.NotFound, restoreResponse.StatusCode);
+    }
+
     private static async Task<AuthTokenResponse> RegisterAsync(HttpClient client, string email)
     {
         using var response = await client.PostAsJsonAsync(

@@ -1,23 +1,47 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type Transaction } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../ui/Button";
 import { MoneyText } from "../../ui/MoneyText";
 import { Panel } from "../../ui/Panel";
+import { StatusBadge } from "../../ui/StatusBadge";
+
+type TransactionFormState = {
+  description: string;
+  amountInCents: string;
+  merchant: string;
+  transactionDate: string;
+  notes: string;
+};
+
+const emptyForm = (): TransactionFormState => ({
+  description: "",
+  amountInCents: "",
+  merchant: "",
+  transactionDate: new Date().toISOString().slice(0, 10),
+  notes: ""
+});
 
 export function TransactionsPage() {
   const auth = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [description, setDescription] = useState("");
-  const [amountInCents, setAmountInCents] = useState("");
-  const [merchant, setMerchant] = useState("");
+  const [form, setForm] = useState<TransactionFormState>(() => emptyForm());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletedTransaction, setDeletedTransaction] = useState<Transaction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const editingTransaction = useMemo(
+    () => transactions.find((transaction) => transaction.id === editingId) ?? null,
+    [editingId, transactions]
+  );
 
   useEffect(() => {
     let isActive = true;
 
     async function loadTransactions(accessToken: string) {
+      setIsLoading(true);
       try {
         const page = await api.listTransactions(accessToken);
         if (isActive) {
@@ -52,31 +76,117 @@ export function TransactionsPage() {
     }
 
     setError(null);
+    setIsSubmitting(true);
     try {
-      const created = await api.createTransaction(auth.tokens.accessToken, {
-        amountInCents: Number(amountInCents),
-        transactionType: "expense",
-        categoryId: null,
-        description,
-        merchant: merchant || null,
-        transactionDate: new Date().toISOString().slice(0, 10),
-        source: "web"
-      });
-      setTransactions([created, ...transactions]);
-      setDescription("");
-      setAmountInCents("");
-      setMerchant("");
+      if (editingTransaction) {
+        const updated = await api.updateTransaction(auth.tokens.accessToken, editingTransaction.id, {
+          amountInCents: Number(form.amountInCents),
+          transactionType: editingTransaction.transactionType,
+          categoryId: editingTransaction.categoryId,
+          description: form.description,
+          merchant: form.merchant || null,
+          transactionDate: form.transactionDate,
+          notes: form.notes || null
+        });
+        setTransactions((current) =>
+          current.map((transaction) => (transaction.id === updated.id ? updated : transaction))
+        );
+      } else {
+        const created = await api.createTransaction(auth.tokens.accessToken, {
+          amountInCents: Number(form.amountInCents),
+          transactionType: "expense",
+          categoryId: null,
+          description: form.description,
+          merchant: form.merchant || null,
+          transactionDate: form.transactionDate,
+          source: "web"
+        });
+        setTransactions((current) => [created, ...current]);
+      }
+
+      clearForm();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not add transaction.");
+      setError(cause instanceof Error ? cause.message : "Could not save transaction.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
+  async function deleteTransaction(transaction: Transaction) {
+    if (!auth.tokens) {
+      return;
+    }
+
+    setError(null);
+    try {
+      await api.deleteTransaction(auth.tokens.accessToken, transaction.id);
+      setTransactions((current) => current.filter((item) => item.id !== transaction.id));
+      setDeletedTransaction(transaction);
+      if (editingId === transaction.id) {
+        clearForm();
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not delete transaction.");
+    }
+  }
+
+  async function restoreDeletedTransaction() {
+    if (!auth.tokens || !deletedTransaction) {
+      return;
+    }
+
+    setError(null);
+    try {
+      const restored = await api.restoreTransaction(auth.tokens.accessToken, deletedTransaction.id);
+      setTransactions((current) => [restored, ...current]);
+      setDeletedTransaction(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not restore transaction.");
+    }
+  }
+
+  function startEditing(transaction: Transaction) {
+    setEditingId(transaction.id);
+    setForm({
+      description: transaction.description,
+      amountInCents: transaction.amountInCents.toString(),
+      merchant: transaction.merchant ?? "",
+      transactionDate: transaction.transactionDate,
+      notes: transaction.notes ?? ""
+    });
+  }
+
+  function clearForm() {
+    setEditingId(null);
+    setForm(emptyForm());
+  }
+
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
       <section>
-        <h1 className="text-2xl font-bold text-slate-950 dark:text-slate-100">
-          Transactions
-        </h1>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-950 dark:text-slate-100">
+              Transactions
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Add, edit, delete and restore web transactions.
+            </p>
+          </div>
+          <StatusBadge tone="neutral">{transactions.length} active</StatusBadge>
+        </div>
+
+        {deletedTransaction ? (
+          <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm font-semibold">
+              Deleted {deletedTransaction.description}.
+            </p>
+            <Button onClick={() => void restoreDeletedTransaction()} variant="secondary">
+              Restore
+            </Button>
+          </div>
+        ) : null}
+
         <Panel className="mt-5">
           {isLoading ? (
             <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -91,7 +201,7 @@ export function TransactionsPage() {
               {transactions.map((transaction) => (
                 <li
                   key={transaction.id}
-                  className="flex items-center justify-between gap-4 py-4"
+                  className="flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
                     <p className="font-semibold text-slate-950 dark:text-slate-100">
@@ -101,15 +211,28 @@ export function TransactionsPage() {
                       {transaction.merchant ?? transaction.source} -{" "}
                       {transaction.transactionDate}
                     </p>
+                    {transaction.notes ? (
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        {transaction.notes}
+                      </p>
+                    ) : null}
                   </div>
-                  <MoneyText
-                    amountInCents={
-                      transaction.transactionType === "expense"
-                        ? -transaction.amountInCents
-                        : transaction.amountInCents
-                    }
-                    className="font-bold text-slate-950 dark:text-slate-100"
-                  />
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                    <MoneyText
+                      amountInCents={
+                        transaction.transactionType === "expense"
+                          ? -transaction.amountInCents
+                          : transaction.amountInCents
+                      }
+                      className="min-w-20 font-bold text-slate-950 dark:text-slate-100 md:text-right"
+                    />
+                    <Button onClick={() => startEditing(transaction)} variant="secondary">
+                      Edit
+                    </Button>
+                    <Button onClick={() => void deleteTransaction(transaction)} variant="ghost">
+                      Delete
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -117,28 +240,66 @@ export function TransactionsPage() {
         </Panel>
       </section>
 
-      <Panel aria-labelledby="quick-add-heading">
-        <h2
-          id="quick-add-heading"
-          className="text-lg font-bold text-slate-950 dark:text-slate-100"
-        >
-          Quick add
-        </h2>
+      <Panel aria-labelledby="transaction-form-heading">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2
+              id="transaction-form-heading"
+              className="text-lg font-bold text-slate-950 dark:text-slate-100"
+            >
+              {editingTransaction ? "Edit transaction" : "Quick add"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              {editingTransaction ? "Update the selected entry." : "Capture a new expense."}
+            </p>
+          </div>
+          {editingTransaction ? <StatusBadge tone="warning">Editing</StatusBadge> : null}
+        </div>
         <form className="mt-5 space-y-4" onSubmit={submit}>
-          <Field label="Description" value={description} onChange={setDescription} />
+          <Field
+            label="Description"
+            value={form.description}
+            onChange={(value) => setForm((current) => ({ ...current, description: value }))}
+          />
           <Field
             label="Amount in cents"
-            value={amountInCents}
-            onChange={setAmountInCents}
+            value={form.amountInCents}
+            onChange={(value) => setForm((current) => ({ ...current, amountInCents: value }))}
             type="number"
           />
-          <Field label="Merchant" value={merchant} onChange={setMerchant} required={false} />
+          <Field
+            label="Merchant"
+            value={form.merchant}
+            onChange={(value) => setForm((current) => ({ ...current, merchant: value }))}
+            required={false}
+          />
+          <Field
+            label="Transaction date"
+            value={form.transactionDate}
+            onChange={(value) => setForm((current) => ({ ...current, transactionDate: value }))}
+            type="date"
+          />
+          {editingTransaction ? (
+            <Field
+              label="Notes"
+              value={form.notes}
+              onChange={(value) => setForm((current) => ({ ...current, notes: value }))}
+              required={false}
+            />
+          ) : null}
           {error ? (
             <p className="text-sm font-medium text-red-700 dark:text-rose-300">{error}</p>
           ) : null}
-          <Button type="submit" variant="primary">
-            Add expense
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
+              {editingTransaction ? "Save changes" : "Add expense"}
+            </Button>
+            {editingTransaction ? (
+              <Button onClick={clearForm} variant="ghost">
+                Cancel
+              </Button>
+            ) : null}
+          </div>
         </form>
       </Panel>
     </div>

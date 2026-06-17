@@ -56,6 +56,26 @@ export type PagedResponse<T> = {
   totalPages: number;
 };
 
+export type CreateTransactionInput = {
+  amountInCents: number;
+  transactionType: "expense" | "income";
+  categoryId: string | null;
+  description: string;
+  merchant: string | null;
+  transactionDate: string;
+  source: "web";
+};
+
+export type UpdateTransactionInput = {
+  amountInCents: number;
+  transactionType: "expense" | "income";
+  categoryId: string;
+  description: string;
+  merchant: string | null;
+  transactionDate: string;
+  notes: string | null;
+};
+
 type RequestOptions = RequestInit & {
   accessToken?: string | null;
 };
@@ -140,15 +160,7 @@ export const api = {
         }),
   createTransaction: (
     accessToken: string,
-    body: {
-      amountInCents: number;
-      transactionType: "expense" | "income";
-      categoryId: string | null;
-      description: string;
-      merchant: string | null;
-      transactionDate: string;
-      source: "web";
-    }
+    body: CreateTransactionInput
   ) =>
     IS_DEMO_MODE
       ? demoApi.createTransaction(accessToken, body)
@@ -156,6 +168,28 @@ export const api = {
           method: "POST",
           accessToken,
           body: JSON.stringify(body)
+        }),
+  updateTransaction: (accessToken: string, id: string, body: UpdateTransactionInput) =>
+    IS_DEMO_MODE
+      ? demoApi.updateTransaction(accessToken, id, body)
+      : apiRequest<Transaction>(`/transactions/${id}`, {
+          method: "PUT",
+          accessToken,
+          body: JSON.stringify(body)
+        }),
+  deleteTransaction: (accessToken: string, id: string) =>
+    IS_DEMO_MODE
+      ? demoApi.deleteTransaction(accessToken, id)
+      : apiRequest<void>(`/transactions/${id}`, {
+          method: "DELETE",
+          accessToken
+        }),
+  restoreTransaction: (accessToken: string, id: string) =>
+    IS_DEMO_MODE
+      ? demoApi.restoreTransaction(accessToken, id)
+      : apiRequest<Transaction>(`/transactions/${id}/restore`, {
+          method: "POST",
+          accessToken
         })
 };
 
@@ -202,7 +236,7 @@ const demoApi = {
   },
   async listTransactions(accessToken: string): Promise<PagedResponse<Transaction>> {
     void accessToken;
-    const items = readDemoTransactions();
+    const items = readDemoTransactions().filter((transaction) => transaction.deletedUtc === null);
     return {
       items,
       page: 1,
@@ -213,15 +247,7 @@ const demoApi = {
   },
   async createTransaction(
     accessToken: string,
-    body: {
-      amountInCents: number;
-      transactionType: "expense" | "income";
-      categoryId: string | null;
-      description: string;
-      merchant: string | null;
-      transactionDate: string;
-      source: "web";
-    }
+    body: CreateTransactionInput
   ): Promise<Transaction> {
     void accessToken;
     const now = new Date().toISOString();
@@ -238,6 +264,60 @@ const demoApi = {
     const next = [transaction, ...readDemoTransactions()].slice(0, 20);
     window.localStorage.setItem(demoTransactionsKey, JSON.stringify(next));
     return transaction;
+  },
+  async updateTransaction(
+    accessToken: string,
+    id: string,
+    body: UpdateTransactionInput
+  ): Promise<Transaction> {
+    void accessToken;
+    const transactions = readDemoTransactions();
+    const existing = transactions.find((transaction) => transaction.id === id);
+
+    if (!existing) {
+      throw new ApiError(404, "Transaction was not found.");
+    }
+
+    const updated: Transaction = {
+      ...existing,
+      ...body,
+      updatedUtc: new Date().toISOString()
+    };
+    writeDemoTransactions(
+      transactions.map((transaction) => (transaction.id === id ? updated : transaction))
+    );
+    return updated;
+  },
+  async deleteTransaction(accessToken: string, id: string): Promise<void> {
+    void accessToken;
+    const transactions = readDemoTransactions();
+    const deletedUtc = new Date().toISOString();
+    writeDemoTransactions(
+      transactions.map((transaction) =>
+        transaction.id === id
+          ? { ...transaction, deletedUtc, updatedUtc: deletedUtc }
+          : transaction
+      )
+    );
+  },
+  async restoreTransaction(accessToken: string, id: string): Promise<Transaction> {
+    void accessToken;
+    const transactions = readDemoTransactions();
+    const existing = transactions.find((transaction) => transaction.id === id);
+
+    if (!existing) {
+      throw new ApiError(404, "Transaction was not found.");
+    }
+
+    const restored: Transaction = {
+      ...existing,
+      deletedUtc: null,
+      updatedUtc: new Date().toISOString()
+    };
+    writeDemoTransactions(
+      transactions.map((transaction) => (transaction.id === id ? restored : transaction))
+    );
+    return restored;
   }
 };
 
@@ -294,6 +374,10 @@ function readDemoTransactions(): Transaction[] {
   } catch {
     return fallback;
   }
+}
+
+function writeDemoTransactions(transactions: Transaction[]) {
+  window.localStorage.setItem(demoTransactionsKey, JSON.stringify(transactions));
 }
 
 function readDemoUser() {

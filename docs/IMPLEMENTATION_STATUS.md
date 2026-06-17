@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 2 first vertical slice in progress.
+Wave 3 budgeting ready to start.
 
 Actual repository state at bootstrap start:
 - Blueprint documents are present.
@@ -17,7 +17,7 @@ Actual repository state at bootstrap start:
 |---|---|---|
 | 0 Repository bootstrap | Complete | Passed |
 | 1 Domain/platform foundation | Complete | Passed |
-| 2 First vertical slice | In progress | Pending |
+| 2 First vertical slice | Complete | Passed |
 | 3 Budgeting | Not started | Pending |
 | 4 Dashboard | Not started | Pending |
 | 5 WhatsApp capture | Not started | Pending |
@@ -133,6 +133,22 @@ Actual repository state at bootstrap start:
 - `npm run build` passed.
 - In-app browser smoke check passed for `http://127.0.0.1:5173/login`.
 - In-app browser registration check passed for `http://127.0.0.1:5173/register` to `/onboarding`.
+- `npm run test:e2e` is not available yet.
+
+### RW-207 Wave 2 vertical-slice acceptance
+
+- RW-205 live frontend transaction flow complete for list, quick add, edit, soft-delete and restore.
+- RW-206 cross-user authorization integration tests complete for get, update, delete, restore and list isolation.
+- Frontend API client and GitHub Pages demo adapter now support the full transaction lifecycle.
+- `dotnet test tests/RandWise.IntegrationTests/RandWise.IntegrationTests.csproj` passed with 15 tests.
+- `dotnet format RandWise.sln --verify-no-changes` passed.
+- `dotnet test RandWise.sln` passed with 34 tests.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed with 7 tests.
+- `npm run build` passed.
+- `VITE_DEMO_MODE=true npm run build` passed.
+- Live browser smoke check passed against local API and Vite for register -> transactions -> add -> edit -> soft-delete -> restore.
 - `npm run test:e2e` is not available yet.
 
 ## Open decisions
