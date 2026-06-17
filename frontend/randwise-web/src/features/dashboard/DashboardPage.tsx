@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { dashboardFixture, type CategoryGroup, type DashboardSummary as DashboardViewModel, type SavingsTarget } from "./dashboardFixture";
 import { api, type DashboardSummary as LiveDashboardSummary } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { usePrivacyMode } from "../../privacy/privacyModeState";
 import { Button } from "../../ui/Button";
 import { MoneyText } from "../../ui/MoneyText";
 import { Panel } from "../../ui/Panel";
@@ -17,6 +18,7 @@ const accentClasses: Record<CategoryGroup["accent"], string> = {
 
 export function DashboardPage() {
   const auth = useAuth();
+  const { isPrivacyMode } = usePrivacyMode();
   const [liveDashboard, setLiveDashboard] = useState<LiveDashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dashboard = liveDashboard ? toViewModel(liveDashboard) : dashboardFixture;
@@ -98,6 +100,7 @@ export function DashboardPage() {
               day for {dashboard.budgetPeriod.daysRemaining} days. Protected cash is{" "}
               <MoneyText amountInCents={dashboard.safeToSpend.protectedAmountInCents} />.
             </p>
+            <SafeToSpendBreakdown dashboard={dashboard} />
           </div>
         </Panel>
 
@@ -289,7 +292,9 @@ export function DashboardPage() {
                   <div>
                     <p className="font-semibold text-slate-950 dark:text-slate-100">{transaction.description}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {transaction.categoryName} - {transaction.transactionDate}
+                      {transaction.categoryName}
+                      {transaction.merchant && !isPrivacyMode ? ` - ${transaction.merchant}` : ""} -{" "}
+                      {transaction.transactionDate}
                     </p>
                   </div>
                   <MoneyText
@@ -320,6 +325,38 @@ export function DashboardPage() {
           </div>
         </Panel>
       </section>
+    </div>
+  );
+}
+
+function SafeToSpendBreakdown({ dashboard }: { dashboard: DashboardViewModel }) {
+  return (
+    <details className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700 dark:text-slate-100">
+        How this is calculated
+      </summary>
+      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">
+        Available cash minus protected money, capped by remaining category budget.
+      </p>
+      <dl className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+        <BreakdownRow label="Available cash" amountInCents={dashboard.safeToSpend.availableCashInCents} />
+        <BreakdownRow label="Protected money" amountInCents={dashboard.safeToSpend.protectedAmountInCents} />
+        <BreakdownRow label="Safety buffer" amountInCents={dashboard.safeToSpend.safetyBufferInCents} />
+        <BreakdownRow label="Savings commitment" amountInCents={dashboard.safeToSpend.savingsCommitmentInCents} />
+        <BreakdownRow label="Upcoming commitments" amountInCents={dashboard.safeToSpend.upcomingCommitmentsInCents} />
+        <BreakdownRow label="Remaining category budget" amountInCents={dashboard.safeToSpend.remainingCategoryBudgetInCents} />
+      </dl>
+    </details>
+  );
+}
+
+function BreakdownRow({ label, amountInCents }: { label: string; amountInCents: number }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-md bg-white px-3 py-2 dark:bg-slate-900">
+      <dt className="text-slate-600 dark:text-slate-400">{label}</dt>
+      <dd className="font-semibold text-slate-950 dark:text-slate-100">
+        <MoneyText amountInCents={amountInCents} />
+      </dd>
     </div>
   );
 }

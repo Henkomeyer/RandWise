@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Wave 4 dashboard is in progress. The composite dashboard API and live frontend connection are complete.
+Wave 4 dashboard is complete. Wave 5 WhatsApp capture is the next incomplete wave.
 
 Actual repository state:
 - .NET 10 modular-monolith backend is present with API, Application, Contracts, Domain and Infrastructure projects.
@@ -18,7 +18,7 @@ Actual repository state:
 | 1 Domain/platform foundation | Complete | Passed |
 | 2 First vertical slice | Complete | Passed |
 | 3 Budgeting | Complete | Passed |
-| 4 Dashboard | In progress | Pending |
+| 4 Dashboard | Complete | Passed |
 | 5 WhatsApp capture | Not started | Pending |
 | 6 Intelligence/jobs | Not started | Pending |
 | 7 Reports/privacy | Not started | Pending |
@@ -185,6 +185,24 @@ Actual repository state:
 - `npm run test` passed with 8 tests.
 - `npm run build` passed.
 - `VITE_DEMO_MODE=true npm run build` passed.
+
+### RW-409 Wave 4 dashboard acceptance
+
+- RW-407 privacy mode and calculation breakdown complete.
+- RW-408 dashboard responsive/accessibility test expansion complete.
+- Intentional API contract addition: dashboard `safeToSpend` now includes `savingsCommitmentInCents`, `upcomingCommitmentsInCents` and `remainingCategoryBudgetInCents` so the frontend can explain the calculation without inventing client-side logic.
+- Dashboard recent-transaction merchant details are hidden when privacy mode is enabled.
+- Browser verification passed for desktop `1280x720` light and dark theme transitions with no horizontal overflow.
+- Browser verification passed for mobile `390x844` with bottom navigation, open calculation breakdown, privacy redaction and no horizontal overflow.
+- In-app browser console verification reported no warnings or errors.
+- `dotnet format RandWise.sln --verify-no-changes` passed.
+- `dotnet test RandWise.sln` passed with 36 tests.
+- `npm run lint` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed with 9 tests.
+- `npm run build` passed.
+- `VITE_DEMO_MODE=true npm run build` passed.
+- `npm run test:e2e` is not available yet.
 
 ## Open decisions
 

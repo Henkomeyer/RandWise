@@ -70,7 +70,7 @@ describe("RandWise app shell", () => {
     expect(
       screen.getByRole("heading", { name: /safe to spend/i })
     ).toBeInTheDocument();
-    expect(screen.getByText("R2,840")).toBeInTheDocument();
+    expect(screen.getAllByText("R2,840").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/10 days/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/slow down on takeaways/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /category groups/i })).toBeInTheDocument();
@@ -116,6 +116,23 @@ describe("RandWise app shell", () => {
     expect(screen.getByRole("heading", { name: /recurring commitments/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /saving targets/i })).toBeInTheDocument();
     expect(screen.getByText(/weekly buffer/i)).toBeInTheDocument();
+  });
+
+  it("renders live dashboard breakdown and hides merchant details in privacy mode", async () => {
+    mockAuthenticatedSession();
+    mockDashboardWorkspace();
+
+    renderShell("/dashboard");
+
+    expect(await screen.findByText("Live plan")).toBeInTheDocument();
+    expect(screen.getByText("How this is calculated")).toBeInTheDocument();
+    expect(screen.getByText("Available cash")).toBeInTheDocument();
+    expect(screen.getByText(/Shoprite/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /turn privacy mode on/i }));
+
+    expect(screen.getAllByLabelText("Amount hidden").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Shoprite/)).not.toBeInTheDocument();
   });
 
   it("supports the transaction create edit delete and restore flow", async () => {
@@ -235,7 +252,7 @@ describe("RandWise app shell", () => {
   it("redacts visible dashboard money when privacy mode is enabled", () => {
     renderShell();
 
-    expect(screen.getByText("R2,840")).toBeInTheDocument();
+    expect(screen.getAllByText("R2,840").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /turn privacy mode on/i }));
 
@@ -362,6 +379,102 @@ function mockBudgetWorkspace() {
         amountInCents: 375000,
         dailyAmountInCents: 26785,
         daysRemaining: 14
+      });
+    }
+
+    return jsonResponse({ title: "Unexpected request" }, 500);
+  });
+}
+
+function mockDashboardWorkspace() {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = input.toString();
+
+    if (url.endsWith("/dashboard")) {
+      return jsonResponse({
+        generatedUtc: "2026-06-17T10:00:00Z",
+        budgetPeriod: {
+          id: "period-1",
+          startDate: "2026-06-01",
+          endDate: "2026-06-30",
+          daysRemaining: 14,
+          periodProgressPercent: 48
+        },
+        financialStatus: {
+          status: "onTrack",
+          message: "You are currently on track.",
+          moneyPulse: 76
+        },
+        safeToSpend: {
+          amountInCents: 375000,
+          dailyAmountInCents: 26785,
+          availableCashInCents: 2600000,
+          protectedAmountInCents: 350000,
+          safetyBufferInCents: 50000,
+          savingsCommitmentInCents: 250000,
+          upcomingCommitmentsInCents: 50000,
+          remainingCategoryBudgetInCents: 375000
+        },
+        spending: {
+          spentThisPeriodInCents: 125000,
+          spendingPercent: 25,
+          expectedSpendingPercent: 48
+        },
+        recommendedAction: {
+          type: "onTrack",
+          title: "Keep the current pace",
+          message: "Safe-to-spend is positive and spending is aligned."
+        },
+        categories: [
+          {
+            categoryId: "category-1",
+            name: "Groceries",
+            allocatedInCents: 500000,
+            spentInCents: 125000,
+            remainingInCents: 375000,
+            spendingPercent: 25,
+            status: "onTrack",
+            latestTransaction: "Weekly groceries"
+          }
+        ],
+        upcomingCommitments: [
+          {
+            id: "commitment-1",
+            description: "Internet",
+            dueDate: "2026-06-21",
+            amountInCents: 50000,
+            isProtected: true,
+            status: "protected"
+          }
+        ],
+        recentTransactions: [
+          {
+            id: "transaction-1",
+            description: "Groceries",
+            merchant: "Shoprite",
+            categoryName: "Groceries",
+            transactionDate: "2026-06-17",
+            amountInCents: 125000,
+            transactionType: "expense",
+            source: "web",
+            status: "confirmed"
+          }
+        ],
+        cashFlowForecast: [
+          {
+            date: "2026-06-17",
+            projectedBalanceInCents: 2600000,
+            commitmentAmountInCents: 0,
+            isPayday: false
+          }
+        ],
+        insights: [
+          {
+            type: "positive",
+            title: "Budget is stable",
+            message: "Safe-to-spend and category pacing are workable."
+          }
+        ]
       });
     }
 

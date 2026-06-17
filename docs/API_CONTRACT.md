@@ -127,7 +127,10 @@ Filters:
     "dailyAmountInCents": 28400,
     "availableCashInCents": 610000,
     "protectedAmountInCents": 326000,
-    "safetyBufferInCents": 50000
+    "safetyBufferInCents": 50000,
+    "savingsCommitmentInCents": 220000,
+    "upcomingCommitmentsInCents": 56000,
+    "remainingCategoryBudgetInCents": 284000
   },
   "spending": {
     "spentThisPeriodInCents": 842000,

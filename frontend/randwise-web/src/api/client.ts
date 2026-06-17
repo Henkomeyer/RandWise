@@ -142,6 +142,9 @@ export type DashboardSummary = {
     availableCashInCents: number;
     protectedAmountInCents: number;
     safetyBufferInCents: number;
+    savingsCommitmentInCents: number;
+    upcomingCommitmentsInCents: number;
+    remainingCategoryBudgetInCents: number;
   };
   spending: {
     spentThisPeriodInCents: number;
@@ -828,7 +831,10 @@ const demoApi = {
         dailyAmountInCents: safe.dailyAmountInCents,
         availableCashInCents: safe.availableCashInCents,
         protectedAmountInCents: safe.protectedAmountInCents,
-        safetyBufferInCents: safe.safetyBufferInCents
+        safetyBufferInCents: safe.safetyBufferInCents,
+        savingsCommitmentInCents: safe.savingsCommitmentInCents,
+        upcomingCommitmentsInCents: safe.upcomingCommitmentsInCents,
+        remainingCategoryBudgetInCents: safe.remainingCategoryBudgetInCents
       },
       spending: {
         spentThisPeriodInCents: spent,

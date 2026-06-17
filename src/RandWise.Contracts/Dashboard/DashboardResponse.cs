@@ -30,7 +30,10 @@ public sealed record DashboardSafeToSpendSummaryResponse(
     long DailyAmountInCents,
     long AvailableCashInCents,
     long ProtectedAmountInCents,
-    long SafetyBufferInCents);
+    long SafetyBufferInCents,
+    long SavingsCommitmentInCents,
+    long UpcomingCommitmentsInCents,
+    long RemainingCategoryBudgetInCents);
 
 public sealed record DashboardSpendingSummaryResponse(
     long SpentThisPeriodInCents,
